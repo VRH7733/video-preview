@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 import torch
 
-from . import camera, frames, residual
+from . import camera, residual
 
 ANALYSIS_LONG_SIDE = 320  # px; analysis frames are at most this big (motion of 1/320 of the frame is still seen)
 STEP_SECONDS = 0.25  # frames are compared this far apart, so slow motion adds up above the noise floor
@@ -70,22 +70,23 @@ def _median(x):
     return float(x.median()) if x.numel() else 0.0
 
 
-def analyze(images, fps, min_speed, min_area, keep_masks=False):
-    """Analyse an IMAGE batch (N, H, W, C).
+def analyze(gray, nonfinite, fps, min_speed, min_area, keep_masks=False):
+    """Analyse a clip given as small gray analysis frames (N, h, w).
 
-    fps: frames per second of the clip. min_speed: % of the long side per second a pixel must move (after the
-    camera is removed) to count. min_area: % of the textured picture that must move for a time step to count as
-    "moving". Returns (Result, masks), where masks is (N-step, h, w) bool or None.
+    Make them with frames.analysis_frames(IMAGE batch, ANALYSIS_LONG_SIDE) or
+    video_source.VideoStream.analysis_frames(ANALYSIS_LONG_SIDE). nonfinite: NaN/Inf count found while making them.
+    fps: frames per second. min_speed: % of the long side per second a pixel must move (after the camera is
+    removed) to count. min_area: % of the textured picture that must move for a time step to count as "moving".
+    Returns (Result, masks), where masks is (N-step, h, w) bool or None.
     """
-    n = int(images.shape[0])
+    n = int(gray.shape[0])
     fps = float(fps)
     if n < 2:
-        h, w = frames.analysis_size(*images.shape[1:3], ANALYSIS_LONG_SIDE) if images.ndim == 4 else (0, 0)
-        res = Result("unknown", n, fps, 0, (h, w), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0)
-        res.notes.append("Need at least 2 frames to judge motion." if n == 1 else "The image batch is empty.")
+        res = Result("unknown", n, fps, 0, tuple(gray.shape[1:3]), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                     nonfinite)
+        res.notes.append("Need at least 2 frames to judge motion." if n == 1 else "The clip has no frames.")
         return res, None
 
-    gray, nonfinite = frames.analysis_frames(images, ANALYSIS_LONG_SIDE)
     _, h, w = gray.shape
     long_side = float(max(h, w))
     step = step_frames(n, fps)

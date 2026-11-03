@@ -3,7 +3,7 @@
 //   node tests/ui_run.js <video in ComfyUI/input> <screenshot.png> [<exported_workflow.json>] [--url URL]
 //                        [--preview-size N]
 //
-// Builds Load Video -> Get Video Components -> Motion Verdict -> Preview Any in the page, exports the workflow
+// Builds Load Video -> Motion Verdict (VIDEO input, streamed) -> Preview Any in the page, exports the workflow
 // the way the UI saves it, queues it, waits for the verdict badge and the on-node preview video, takes a
 // screenshot and prints every console error / page error. Exit code 1 if the badge or the video does not appear.
 const fs = require("fs");
@@ -34,15 +34,12 @@ const BADGE = /^(ANIMATED|PARTLY_ANIMATED|CAMERA_ONLY|STILL|UNKNOWN):/;
     app.graph.clear();
     const add = (type, x, y) => { const n = LiteGraph.createNode(type); n.pos = [x, y]; app.graph.add(n); return n; };
     const load = add("LoadVideo", 20, 60);
-    const parts = add("GetVideoComponents", 20, 520);
     const mv = add("MotionVerdict", 400, 60);
     const show = add("PreviewAny", 880, 60);
     load.widgets.find((w) => w.name === "file").value = file;
     if (size) mv.widgets.find((w) => w.name === "preview_size").value = size;
-    load.connect(0, parts, 0);
-    parts.connect(0, mv, 0);
-    parts.connect(2, mv, mv.inputs.findIndex((i) => i.name === "fps"));
-    mv.connect(5, show, 0);
+    load.connect(0, mv, mv.inputs.findIndex((i) => i.name === "video"));
+    mv.connect(mv.outputs.findIndex((o) => o.name === "report"), show, 0);
     mv.setSize([440, 660]);
     show.setSize([520, 300]);
     app.graph.setDirtyCanvas(true, true);

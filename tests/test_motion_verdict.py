@@ -10,6 +10,7 @@ import io
 import json
 import math
 import sys
+import tempfile
 import time
 import traceback
 from pathlib import Path
@@ -31,7 +32,12 @@ H, W = 360, 640
 
 
 def run(images, fps=FPS, keep_masks=False):
-    return analysis.analyze(images, fps, MIN_SPEED, MIN_AREA, keep_masks=keep_masks)
+    gray, nonfinite = frames.analysis_frames(images, analysis.ANALYSIS_LONG_SIDE)
+    return analysis.analyze(gray, nonfinite, fps, MIN_SPEED, MIN_AREA, keep_masks=keep_masks)
+
+
+def node(preview="off", size=512, **source):
+    return MotionVerdict().run(FPS, MIN_SPEED, MIN_AREA, preview, size, False, **source)
 
 
 def per_second(v):
@@ -202,12 +208,12 @@ def test_nan_inf_counted_and_input_untouched():
     v[3, 10:20, 10:20, 0] = float("nan")
     v[5, 0, 0, 1] = float("inf")
     before = v.clone()
-    out = MotionVerdict().run(v, FPS, MIN_SPEED, MIN_AREA, "off", 512, False)["result"]
-    assert out[0] is v
+    out = node(images=v)["result"]
+    assert out[0] is v and out[1] is None
     assert torch.equal(torch.isnan(v), torch.isnan(before)) and torch.equal(v.nan_to_num(), before.nan_to_num())
-    data = json.loads(out[6])
+    data = json.loads(out[7])
     assert data["clip"]["nonfinite_values"] == 101, data["clip"]
-    assert math.isfinite(out[3])
+    assert math.isfinite(out[4])
 
 
 def test_chunked_conversion_is_identical():
@@ -244,9 +250,9 @@ def test_other_frame_rates():
 
 def test_node_outputs_and_passthrough():
     v = synth.clip(n=33, h=180, w=320, subject=PATCH)
-    out = MotionVerdict().run(v, FPS, MIN_SPEED, MIN_AREA, "video + motion overlay", 512, False)
-    images, verdict, animated, subject, timeline, text, data = out["result"]
-    assert images is v
+    out = node("video + motion overlay", images=v)
+    images, video, verdict, animated, subject, timeline, text, data = out["result"]
+    assert images is v and video is None
     assert verdict == "animated" and animated is True and isinstance(subject, float)
     assert timeline.shape == (1, HEIGHT, WIDTH, 3) and timeline.dtype == torch.float32
     assert 0 <= float(timeline.min()) and float(timeline.max()) <= 1
@@ -263,9 +269,9 @@ def test_node_outputs_and_passthrough():
 
 def test_node_preview_off_and_animated_flag_false():
     v = synth.clip(n=33, h=180, w=320, cam=lambda i: (0, 0, 1.05 ** (i / FPS), 0))
-    out = MotionVerdict().run(v, FPS, MIN_SPEED, MIN_AREA, "off", 512, False)
+    out = node(images=v)
     assert out["ui"]["motion_verdict"][0]["token"] is None
-    assert out["result"][1] == "camera_only" and out["result"][2] is False
+    assert out["result"][2] == "camera_only" and out["result"][3] is False
 
 
 def test_preview_size_range_and_no_upscale():
@@ -276,11 +282,138 @@ def test_preview_size_range_and_no_upscale():
 
     big = synth.clip(n=9, h=1080, w=1920, subject=PATCH)
     for side, expect in ((1440, (1440, 810)), (256, (256, 144))):
-        out = MotionVerdict().run(big, FPS, MIN_SPEED, MIN_AREA, "video + motion overlay", side, False)
+        out = node("video + motion overlay", side, images=big)
         assert size_of(PREVIEWS.get(out["ui"]["motion_verdict"][0]["token"])) == (*expect, 9), side
     small = synth.clip(n=9, h=181, w=321)  # odd size, smaller than the preview: kept, rounded down to even
-    out = MotionVerdict().run(small, FPS, MIN_SPEED, MIN_AREA, "video", 1440, False)
+    out = node("video", 1440, images=small)
     assert size_of(PREVIEWS.get(out["ui"]["motion_verdict"][0]["token"])) == (320, 180, 9)
+
+
+# ---------------------------------------------------------------- VIDEO input (streamed)
+
+class FakeVideo:
+    """The parts of ComfyUI's VideoFromFile that the node uses, for tests without ComfyUI."""
+
+    def __init__(self, path, start=0.0, duration=0.0, dims=None):
+        self.path, self.trim, self.dims, self.decoded_by_comfy = path, (start, duration), dims, False
+
+    def get_stream_source(self):
+        return str(self.path)
+
+    def get_active_trim_window(self):
+        return self.trim
+
+    def get_dimensions(self):
+        if self.dims:
+            return self.dims
+        with av.open(str(self.path)) as c:
+            return c.streams.video[0].width, c.streams.video[0].height
+
+    def get_frame_rate(self):
+        with av.open(str(self.path)) as c:
+            return c.streams.video[0].average_rate
+
+    def get_components(self):
+        from types import SimpleNamespace
+
+        from eval_clips import decode
+
+        self.decoded_by_comfy = True
+        images, fps = decode(self.path)
+        return SimpleNamespace(images=images, frame_rate=fps)
+
+
+def mp4(tmp_name, clip, fps=FPS):
+    from derive_clips import write_mp4
+
+    path = Path(tempfile.gettempdir()) / tmp_name
+    write_mp4(clip, path, fps=fps)
+    return path
+
+
+def test_video_input_streams_and_matches_images():
+    from eval_clips import decode
+
+    for name, clip in (("mv_t_anim.mp4", synth.clip(n=33, h=360, w=640, subject=PATCH)),
+                       ("mv_t_cam.mp4", synth.clip(n=33, h=360, w=640, cam=lambda i: (0, 0, 1.05 ** (i / FPS), 0)))):
+        path = mp4(name, clip)
+        fake = FakeVideo(path)
+        streamed = node("video + motion overlay", video=fake)
+        decoded = node(images=decode(path)[0])
+        assert not fake.decoded_by_comfy and streamed["result"][1] is fake and streamed["result"][0] is None
+        assert streamed["result"][2] == decoded["result"][2], (name, streamed["result"][2], decoded["result"][2])
+        a, b = streamed["result"][4], decoded["result"][4]
+        assert abs(a - b) <= 0.25 * max(a, b) + 0.05, (name, a, b)
+        with av.open(io.BytesIO(PREVIEWS.get(streamed["ui"]["motion_verdict"][0]["token"]))) as c:
+            assert sum(1 for _ in c.decode(c.streams.video[0])) == 33
+
+
+def test_video_trim_window_is_honoured():
+    path = mp4("mv_t_trim.mp4", synth.clip(n=48, h=180, w=320, subject=PATCH))
+    data = json.loads(node(video=FakeVideo(path, start=1.0, duration=1.0))["result"][7])
+    assert data["clip"]["frames"] == 16, data["clip"]  # 1 s at 16 fps, from frame 16 on
+
+
+def test_cropped_video_falls_back_to_comfy_decoder():
+    path = mp4("mv_t_crop.mp4", synth.clip(n=17, h=180, w=320, subject=PATCH))
+    fake = FakeVideo(path, dims=(200, 100))  # what a cropped VideoFromFile reports
+    out = node(video=fake)["result"]
+    assert fake.decoded_by_comfy and out[2] in analysis.VERDICTS
+
+
+def test_exactly_one_input_required():
+    for kwargs in ({}, {"images": torch.zeros(2, 8, 8, 3), "video": object()}):
+        try:
+            node(**kwargs)
+        except ValueError:
+            continue
+        raise AssertionError(f"no error for {list(kwargs)}")
+
+
+MEMORY_PROBE = r"""
+import sys, json
+sys.path[:0] = [sys.argv[1], sys.argv[2]]
+from test_motion_verdict import FakeVideo, node
+
+def peak_mb():  # this process's own high-water mark (Linux ru_maxrss is inherited from the parent, so not used)
+    try:
+        with open("/proc/self/status") as f:  # Linux
+            return next(int(line.split()[1]) for line in f if line.startswith("VmHWM")) / 1024
+    except OSError:  # Windows
+        import psutil
+        return psutil.Process().memory_info().peak_wset / 2**20
+
+import torch
+torch.ones(256, 1024, 1024).sum()  # 1 GB spike first, so the peak below is set by the run, not by imports
+del torch
+FakeVideo(sys.argv[3]).get_dimensions()
+before = peak_mb()
+if sys.argv[4] == "video":
+    out = node("video + motion overlay", 1440, video=FakeVideo(sys.argv[3]))
+else:  # control: the same clip as one full-size IMAGE batch, as Load Video -> Get Video Components would give
+    out = node("video + motion overlay", 1440, images=FakeVideo(sys.argv[3]).get_components().images)
+print(json.dumps({"extra_mb": peak_mb() - before, "verdict": out["result"][2]}))
+"""
+
+
+def test_video_stream_never_holds_full_size_frames():
+    import subprocess
+
+    n, h, w = 32, 1440, 2560
+    path = mp4("mv_t_big.mp4", synth.clip(n=n, h=h, w=w, subject=synth.moving_patch(400, 800, (300, 400), 8)))
+    full_mb = n * h * w * 3 * 4 / 2**20  # what one full-size float IMAGE batch of this clip would take
+    here = Path(__file__).resolve().parent
+
+    def probe(mode):
+        res = subprocess.run([sys.executable, "-c", MEMORY_PROBE, str(here.parent), str(here), str(path), mode],
+                             capture_output=True, text=True, timeout=600)
+        assert res.returncode == 0, res.stderr[-2000:]
+        return json.loads(res.stdout.strip().splitlines()[-1])
+
+    streamed, control = probe("video"), probe("images")
+    assert streamed["verdict"] == control["verdict"] == "animated", (streamed, control)
+    assert control["extra_mb"] > 0.75 * full_mb, ("the probe cannot see a full-size batch", control, full_mb)
+    assert streamed["extra_mb"] < 0.25 * full_mb, (streamed, full_mb)
 
 
 def test_preview_store_evicts_oldest():

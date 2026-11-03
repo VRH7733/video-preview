@@ -2,7 +2,8 @@
 
     python tests/eval_clips.py <folder> [--min-speed 1.5] [--min-area 0.3] [--json out.json] [--sheets <dir>]
 
-Decodes with PyAV (mp4, webm, mov, mkv, gif, animated webp). fps is taken from the frame timestamps.
+Decodes with PyAV (mp4, webm, mov, mkv, gif, animated webp) through the node's own streaming reader, so 4K and
+long clips are shrunk frame by frame and never held at full size. fps is taken from the frame timestamps.
 --sheets writes a contact sheet (8 frames) per clip, to check the verdicts by eye.
 No ComfyUI needed.
 """
@@ -18,22 +19,29 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from motion_verdict.analysis import analyze  # noqa: E402
+from motion_verdict import analysis, frames  # noqa: E402
+from motion_verdict.video_source import VideoStream  # noqa: E402
 
 EXTS = {".mp4", ".webm", ".mov", ".mkv", ".gif", ".webp", ".avi"}
 
 
-def decode(path):
-    """Return (IMAGE tensor (N, H, W, 3) float 0..1, fps)."""
+def timestamp_fps(path):
+    """fps from the median frame step (container rates of animated WebP / GIF are often wrong)."""
     with av.open(str(path)) as c:
         s = c.streams.video[0]
-        frames, times = [], []
-        for f in c.decode(s):
-            frames.append(f.to_ndarray(format="rgb24"))
-            times.append(f.time)
+        times = [f.time for f in c.decode(s)]
+        rate = float(s.average_rate or 16)
     steps = [b - a for a, b in zip(times, times[1:]) if a is not None and b is not None and b > a]
-    fps = 1.0 / float(np.median(steps)) if steps else float(s.average_rate or 16)
-    return torch.from_numpy(np.stack(frames)).float() / 255.0, fps
+    return 1.0 / float(np.median(steps)) if steps else rate
+
+
+def decode(path, max_side=None):
+    """Return (IMAGE tensor (N, H, W, 3) float 0..1, fps). With max_side the frames are shrunk while decoding."""
+    stream = VideoStream(str(path))
+    h, w = stream.height, stream.width
+    if max_side:
+        h, w = frames.analysis_size(h, w, max_side)
+    return torch.cat(list(stream.chunks(h, w))), timestamp_fps(path)
 
 
 def sheet(images, out):
@@ -59,12 +67,14 @@ def main():
     rows = []
     for p in files:
         try:
-            images, fps = decode(p)
+            stream = VideoStream(str(p))
+            fps = timestamp_fps(p)
+            t = time.time()
+            gray, nonfinite = stream.analysis_frames(analysis.ANALYSIS_LONG_SIDE)
         except Exception as e:  # report and continue with the next clip
-            print(f"{p.name}: cannot decode ({e})")
+            print(f"{p.name}: cannot decode ({type(e).__name__}: {e})")
             continue
-        t = time.time()
-        r, _ = analyze(images, fps, a.min_speed, a.min_area)
+        r, _ = analysis.analyze(gray, nonfinite, fps, a.min_speed, a.min_area)
         dt = time.time() - t
         rows.append({"file": p.name, "verdict": r.verdict, "subject_motion": round(r.subject_motion, 3),
                      "active_ratio": round(r.active_ratio, 3), "camera_speed": round(r.camera_speed, 2),
@@ -75,7 +85,7 @@ def main():
               f"cam={r.camera_speed:5.1f}%/s inl={r.camera_inliers:.2f} {r.frames}f@{fps:.0f} {dt:.2f}s")
         if a.sheets:
             Path(a.sheets).mkdir(parents=True, exist_ok=True)
-            sheet(images, Path(a.sheets) / f"{p.stem}.png")
+            sheet(decode(p, max_side=256)[0], Path(a.sheets) / f"{p.stem}.png")
     counts = {}
     for row in rows:
         counts[row["verdict"]] = counts.get(row["verdict"], 0) + 1

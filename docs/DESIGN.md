@@ -27,8 +27,9 @@ Node id `MotionVerdict` · display name "Motion Verdict (animated / camera-only 
 
 | Input | Type | Default | Range | Meaning |
 |---|---|---|---|---|
-| `images` | IMAGE | | | the clip, (N, H, W, C) float |
-| `fps` | FLOAT | 16.0 | 1-240, step 0.01 | frame rate (Wan 16, LTX 24/25). Connect *Get Video Components → fps* |
+| `images` (optional) | IMAGE | | | the clip, (N, H, W, C) float. Exactly one of `images` / `video` |
+| `video` (optional) | VIDEO | | | the clip as a VIDEO, streamed (see §3.0). Exactly one of `images` / `video` |
+| `fps` | FLOAT | 16.0 | 1-240, step 0.01 | frame rate of `images` (Wan 16, LTX 24/25). A `video` uses `get_frame_rate()` |
 | `min_speed` | FLOAT | 1.5 | 0.1-50 | % of the frame per second a pixel must move, after camera removal, to count |
 | `min_area` | FLOAT | 0.3 | 0.01-50 | % of the textured picture that must move for a time step to count as moving |
 | `preview` | COMBO | `video + motion overlay` | `video + motion overlay`, `video`, `off` | on-node preview |
@@ -37,15 +38,16 @@ Node id `MotionVerdict` · display name "Motion Verdict (animated / camera-only 
 
 | # | Output | Type | Content |
 |---|---|---|---|
-| 0 | `images` | IMAGE | the input tensor, **same object**, untouched |
-| 1 | `verdict` | STRING | `animated` \| `partly_animated` \| `camera_only` \| `still` \| `unknown` |
-| 2 | `animated` | BOOLEAN | `verdict == "animated"` |
-| 3 | `subject_motion` | FLOAT | mean % of textured pixels that move on their own |
-| 4 | `timeline` | IMAGE | (1, 192, 768, 3) chart |
-| 5 | `report` | STRING | readable report |
-| 6 | `json` | STRING | all numbers + per-time-step arrays |
+| 0 | `images` | IMAGE | the `images` input, **same object**, untouched (None when `video` was used) |
+| 1 | `video` | VIDEO | the `video` input, **same object**, untouched (None when `images` was used) |
+| 2 | `verdict` | STRING | `animated` \| `partly_animated` \| `camera_only` \| `still` \| `unknown` |
+| 3 | `animated` | BOOLEAN | `verdict == "animated"` |
+| 4 | `subject_motion` | FLOAT | mean % of textured pixels that move on their own |
+| 5 | `timeline` | IMAGE | (1, 192, 768, 3) chart |
+| 6 | `report` | STRING | readable report |
+| 7 | `json` | STRING | all numbers + per-time-step arrays |
 
-`run()` returns `{"ui": {"motion_verdict": [info]}, "result": (outputs 0-6)}`, where `info` =
+`run()` returns `{"ui": {"motion_verdict": [info]}, "result": (outputs 0-7)}`, where `info` =
 `{verdict, headline, report, token, saved}`:
 - `token` is the preview key, or null;
 - `saved` is the `{filename, subfolder, type}` of the JSON file, or null.
@@ -54,7 +56,14 @@ The `ui` part is stored in ComfyUI's `/history`, so API clients can read the ver
 
 ## 3. Pipeline
 
-1. **Analysis frames** (`frames.py`):
+0. **VIDEO input** (`video_source.py`, `node.streamable`):
+   - A VIDEO that exposes its file and trim window (`get_stream_source`, `get_active_trim_window`), with
+     dimensions equal to the raw stream (not cropped) and no rotation, is **streamed** with PyAV.
+   - Each decoded frame is scaled by FFmpeg (`reformat`, area filter) straight to the analysis size, and in a
+     second pass to the preview size. 16 shrunk frames are batched into a tensor.
+   - Trim is the same as ComfyUI's decoder: `start ≤ pts < start + duration`.
+   - Any other VIDEO (cropped, rotated, in memory) goes through `get_components()`, then the IMAGE path below.
+1. **Analysis frames** (`frames.py`, IMAGE path):
    - Rec.601 luma of the first 3 channels. C=1 or 2 uses channel 0; C=4 ignores alpha.
    - NaN/Inf are counted, then replaced (NaN→0, +Inf→1, −Inf→0) **in the analysis copy only**, and clamped
      to 0..1.
@@ -128,13 +137,20 @@ All thresholds are tuned on synthetic clips and on clips derived from real AI vi
 | C = 1 / C = 4 | luma of channel 0 / RGB (alpha ignored); same verdict as RGB (test) |
 | NaN / Inf | counted (reported in the JSON and the notes), replaced only in the analysis copy; the passthrough is the same untouched tensor (test) |
 | black / flat clip | `still`, note |
+| 4K / long files | use the `video` input (streamed); the `images` path needs the full batch to exist upstream |
+| cropped / rotated VIDEO | falls back to ComfyUI's `get_components()` (exact same frames, but full size in memory) |
+| both or neither of `images` / `video` | `ValueError` with a clear message |
 | very long clips | chunked conversion; memory is the 320 px analysis copy (N × 320 × 180 × 4 B ≈ 230 KB per frame) plus 32-pair work buffers; 1,500 frames in the test |
 | portrait | long side → 320 (180×320) |
 | fps 8 / 24 / 30 | k adapts; numbers are per second (test) |
 
 ## 6. Memory plan
 
-- Full-size frames are never copied as a whole: at most `CHUNK_PIXELS` values are converted at a time.
+- **VIDEO input:** full-size frames exist only inside FFmpeg, one at a time, plus its decoder threads.
+  Measured: 2560×1440 → +247 MB for the whole node run, against +1,771 MB for the same clip as an IMAGE batch.
+  4K portrait (75 frames) in ComfyUI: server peak ≤ 0.6 GB above idle, against 7.1 GB for the IMAGE batch.
+- **IMAGE input:** the batch already exists (made by ComfyUI). It is never copied as a whole: at most
+  `CHUNK_PIXELS` values are converted at a time.
 - The analysis copy is N × h × w float32, at most 320 px on the long side. Example: 241 frames of 1080p use
   56 MB, against 6 GB for the IMAGE batch itself.
 - Pair processing holds 32 pairs at a time: warped frames, tiles, FFTs, the Gauss-Newton Jacobian

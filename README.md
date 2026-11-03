@@ -48,9 +48,15 @@ The full research is in [`research/DUPLICATE_RESEARCH.md`](research/DUPLICATE_RE
 
 ## Use it
 1. Add **Motion Verdict** (category `video/Motion Verdict`, node id `MotionVerdict`).
-2. Connect `images` from *VAE Decode*, or from *Load Video → Get Video Components*. For the latter, also connect
-   its `fps` output to `fps`.
-3. Run. The node shows the verdict and a small preview, with the parts that move on their own tinted red.
+2. Connect **one** of:
+   - `video` from *Load Video*. This is best for files, 4K and long clips: the video is **streamed**, each frame is
+     shrunk while it is decoded, so the clip never sits in memory at full size. Its own frame rate is used.
+   - `images` from *VAE Decode* (or any IMAGE batch). Set `fps` to the clip's frame rate.
+3. Run. The node shows the verdict and a preview, with the parts that move on their own tinted red.
+
+Why `video` matters for big files: *Load Video → Get Video Components* turns a clip into a full-size IMAGE batch
+before any node sees it. 285 frames of 4K portrait = 28 GB, which runs out of memory on most PCs. Through the
+`video` input, the same kind of 4K clip was analysed with about 0.6 GB of extra memory (see Measured results).
 
 Example workflow: [`examples/motion_verdict_load_video.json`](examples/motion_verdict_load_video.json). It was
 exported from the ComfyUI UI; pick your own clip in *Load Video*.
@@ -58,8 +64,9 @@ exported from the ComfyUI UI; pick your own clip in *Load Video*.
 ### Inputs
 | Input | Default | Meaning |
 |---|---|---|
-| `images` | | the clip (IMAGE batch) |
-| `fps` | 16 | frames per second (Wan 16, LTX 24/25, Hunyuan 24) |
+| `video` | | the clip as a VIDEO (e.g. *Load Video*), streamed. Connect this **or** `images` |
+| `images` | | the clip as an IMAGE batch (e.g. *VAE Decode*). Connect this **or** `video` |
+| `fps` | 16 | frames per second of `images` (Wan 16, LTX 24/25, Hunyuan 24). A `video` uses its own frame rate |
 | `min_speed` | 1.5 | % of the frame per second that a pixel must move, after the camera is removed, to count. Raise it for grainy footage. |
 | `min_area` | 0.3 | % of the (textured) picture that must move for a moment to count as "moving" |
 | `preview` | video + motion overlay | on-node preview: `video + motion overlay`, `video` or `off`. Encoded in memory; nothing is saved, not even to `temp/` |
@@ -69,7 +76,8 @@ exported from the ComfyUI UI; pick your own clip in *Load Video*.
 ### Outputs
 | Output | Type | Meaning |
 |---|---|---|
-| `images` | IMAGE | the input, unchanged (passthrough) |
+| `images` | IMAGE | the `images` input, unchanged (passthrough); empty when `video` was used |
+| `video` | VIDEO | the `video` input, unchanged (passthrough); empty when `images` was used |
 | `verdict` | STRING | `animated`, `partly_animated`, `camera_only`, `still` or `unknown` |
 | `animated` | BOOLEAN | true only for `animated`; use it to keep or drop a seed |
 | `subject_motion` | FLOAT | mean % of the picture that moves on its own |
@@ -81,8 +89,8 @@ In API runs the node's own result (verdict, headline, report) is also in ComfyUI
 `motion_verdict`.
 
 ## How it works
-1. Each frame is shrunk to a ≤ 320 px greyscale copy, a few frames at a time, so memory stays small for
-   long clips.
+1. Each frame is shrunk to a ≤ 320 px greyscale copy so memory stays small for long clips. A `video` is shrunk
+   by FFmpeg while decoding; an IMAGE batch is shrunk a few frames at a time.
 2. Frames ¼ s apart are compared. The camera motion between them is estimated as an affine transform:
    - phase correlation of the whole frame and of 45 tiles;
    - a robust fit that ignores tiles on a moving subject;
@@ -97,13 +105,22 @@ Formulas, thresholds and their reasons, edge cases and the memory plan are in
 ## Measured results
 Measured on 4 CPU cores, no GPU. Full output is in [`tests/RESULTS.md`](tests/RESULTS.md).
 
-**Speed**
+**Speed and memory**
 - A Wan-size 5 s clip (81 frames at 832×480) takes **2.7 s**.
 - 1,496 frames take 18 s.
+- A **4K portrait clip** (75 frames, 2160×3840) through *Load Video → Motion Verdict* in ComfyUI takes **5.0 s**.
+  The server's memory peak stayed at 1.8 GB, i.e. under 0.6 GB above its idle use, while one full-size IMAGE batch
+  of that clip would be 7.1 GB.
+- 2560×1440 clip, measured in a separate process: the streamed `video` path adds **+247 MB**; the same clip as an
+  IMAGE batch adds **+1,771 MB**.
 
-**Unit tests:** **27/27 pass**. They cover planted pans, tilts, zooms, rolls and moving subjects, plus
-noise / flicker / black false-positive tests and edge cases (0, 1 and 2 frames, odd and tiny sizes, C=1 and
-C=4, NaN/Inf, 1,500 frames, 8-30 fps).
+**Unit tests:** **33/33 pass** on Linux. The earlier 28-test version also passed **28/28 on Windows 10** (ComfyUI
+Desktop 0.43.1, CPU). The tests cover:
+- planted pans, tilts, zooms, rolls and moving subjects;
+- noise / flicker / black false-positive tests;
+- edge cases: 0, 1 and 2 frames, odd and tiny sizes, C=1 and C=4, NaN/Inf, 1,500 frames, 8-30 fps;
+- the streamed `video` input: same verdict as `images`, trim window, crop fallback, memory bound;
+- the preview: 256-1440 px, no upscale.
 
 **Real AI video clips:**
 - **230** example outputs of Wan, LTX, Seedance, Kling, MiniMax, Vidu, Hunyuan, PixVerse and others came back
@@ -117,6 +134,9 @@ C=4, NaN/Inf, 1,500 frames, 8-30 fps).
 - 0.8 s of motion, then frozen → `partly_animated`;
 - the real clip → `animated`.
 
+Both inputs agree: through the streamed `video` reader the same 230 real clips gave **0 different verdicts**, and
+the 195 known-answer clips were again 195/195.
+
 **Thresholds are calibrated only on these clips.** They were **not** calibrated on full-resolution generations
 or on real failed generations; none were available.
 
@@ -129,6 +149,8 @@ or on real failed generations; none were available.
 - **Calibration data:** thresholds were tuned on synthetic clips and on small (≤ 512 px) thumbnails of real
   AI clips. They were **not** tuned on full-resolution user generations. Please report clips that get the
   wrong verdict.
+- **Cropped or rotated VIDEOs** fall back to ComfyUI's own decoder, so the frames match what other nodes see. That
+  path loads the clip at full size, like *Get Video Components*.
 - Tested only in Chromium; Firefox and Safari were not tested. Not tested on RunningHub itself.
 
 ## Requirements

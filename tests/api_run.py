@@ -1,10 +1,12 @@
 """Integration test through a running ComfyUI's HTTP API (no browser).
 
-    python tests/api_run.py [http://127.0.0.1:8188] <video in ComfyUI/input> [<video> ...]
+    python tests/api_run.py [http://127.0.0.1:8188] [--video-only] <video in ComfyUI/input> [<video> ...]
 
-For each video it queues  Load Video -> Get Video Components -> Motion Verdict -> Preview Any (report)
-+ Save Image (timeline), with save_report on, waits for the result and prints what came back through
-/history: the node's own ui payload, the Preview Any text and the saved files. Exit code 1 on any error.
+For each video it queues two workflows, with save_report on:
+  video  : Load Video -> Motion Verdict (VIDEO input, streamed)
+  images : Load Video -> Get Video Components -> Motion Verdict (IMAGE input)
+each followed by Preview Any (report) + Save Image (timeline). It waits for the results and prints what came back
+through /history: the node's own ui payload, the Preview Any text and the saved files. Exit code 1 on any error.
 Uses only the Python standard library.
 """
 
@@ -22,24 +24,32 @@ def call(base, path, data=None):
         return json.loads(r.read())
 
 
-def workflow(video):
-    return {
-        "1": {"class_type": "LoadVideo", "inputs": {"file": video}},
-        "2": {"class_type": "GetVideoComponents", "inputs": {"video": ["1", 0]}},
-        "3": {"class_type": "MotionVerdict", "inputs": {
-            "images": ["2", 0], "fps": ["2", 2], "min_speed": 1.5, "min_area": 0.3,
-            "preview": "video + motion overlay", "preview_size": 512, "save_report": True}},
-        "4": {"class_type": "PreviewAny", "inputs": {"source": ["3", 5]}},
-        "5": {"class_type": "SaveImage", "inputs": {"images": ["3", 4], "filename_prefix": "motion_verdict/timeline"}},
-    }
+REPORT, TIMELINE = 6, 5  # Motion Verdict output slots
+
+
+def workflow(video, mode):
+    mv = {"min_speed": 1.5, "min_area": 0.3, "preview": "video + motion overlay", "preview_size": 512,
+          "save_report": True, "fps": 16.0}
+    wf = {"1": {"class_type": "LoadVideo", "inputs": {"file": video}}}
+    if mode == "video":
+        mv["video"] = ["1", 0]
+    else:
+        wf["2"] = {"class_type": "GetVideoComponents", "inputs": {"video": ["1", 0]}}
+        mv["images"], mv["fps"] = ["2", 0], ["2", 2]
+    wf["3"] = {"class_type": "MotionVerdict", "inputs": mv}
+    wf["4"] = {"class_type": "PreviewAny", "inputs": {"source": ["3", REPORT]}}
+    wf["5"] = {"class_type": "SaveImage", "inputs": {"images": ["3", TIMELINE], "filename_prefix": "motion_verdict/timeline"}}
+    return wf
 
 
 def main():
     args = sys.argv[1:]
     base = args.pop(0) if args and args[0].startswith("http") else "http://127.0.0.1:8188"
+    modes = ("video",) if "--video-only" in args else ("video", "images")
+    args = [a for a in args if a != "--video-only"]
     ok = True
-    for video in args:
-        pid = call(base, "/prompt", {"prompt": workflow(video), "client_id": str(uuid.uuid4())})["prompt_id"]
+    for video, mode in ((v, m) for v in args for m in modes):
+        pid = call(base, "/prompt", {"prompt": workflow(video, mode), "client_id": str(uuid.uuid4())})["prompt_id"]
         t0 = time.time()
         while True:
             hist = call(base, f"/history/{pid}")
@@ -54,7 +64,7 @@ def main():
         mv = outs.get("3", {}).get("motion_verdict", [{}])[0]
         text = outs.get("4", {}).get("text", [""])[0]
         saved = outs.get("5", {}).get("images", [])
-        print(f"== {video}: status={status} in {time.time() - t0:.1f}s")
+        print(f"== {video} [{mode} input]: status={status} in {time.time() - t0:.1f}s")
         print(f"   node ui: verdict={mv.get('verdict')} token={'yes' if mv.get('token') else 'no'} saved={mv.get('saved')}")
         print(f"   Preview Any text, first line: {text.splitlines()[0] if text else None}")
         print(f"   Save Image: {[s['filename'] for s in saved]}")

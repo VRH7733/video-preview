@@ -7,36 +7,41 @@ Environment:
 ## 1. Unit / known-answer / edge-case tests: `python tests/test_motion_verdict.py`
 
 ```
-PASS  test_still_clip_is_still  (1.3s)
-PASS  test_pan_right_is_camera_only_with_correct_sign_and_speed  (1.5s)
-PASS  test_tilt_up_and_down  (2.9s)
-PASS  test_zoom_in_and_out  (2.9s)
+PASS  test_still_clip_is_still  (1.4s)
+PASS  test_pan_right_is_camera_only_with_correct_sign_and_speed  (1.2s)
+PASS  test_tilt_up_and_down  (2.4s)
+PASS  test_zoom_in_and_out  (2.3s)
 PASS  test_roll_sign  (1.3s)
-PASS  test_combined_camera_move_over_still_picture_8bit  (1.4s)
-PASS  test_moving_subject_static_camera_is_animated  (1.3s)
-PASS  test_moving_subject_with_pan_and_with_zoom  (2.6s)
+PASS  test_combined_camera_move_over_still_picture_8bit  (1.3s)
+PASS  test_moving_subject_static_camera_is_animated  (1.1s)
+PASS  test_moving_subject_with_pan_and_with_zoom  (2.5s)
 PASS  test_small_subject_is_found  (1.3s)
-PASS  test_motion_that_stops_is_partly_animated_with_a_stall  (1.4s)
-PASS  test_clip_that_starts_moving_late_reports_the_stall_at_the_start  (1.5s)
-PASS  test_noise_and_flicker_on_a_still_picture_are_still  (1.4s)
+PASS  test_motion_that_stops_is_partly_animated_with_a_stall  (1.1s)
+PASS  test_clip_that_starts_moving_late_reports_the_stall_at_the_start  (1.2s)
+PASS  test_noise_and_flicker_on_a_still_picture_are_still  (1.3s)
 PASS  test_noise_on_camera_move_is_camera_only  (1.4s)
 PASS  test_black_clip_is_still_with_a_note  (0.0s)
-PASS  test_slow_drift_below_camera_threshold_is_still  (1.5s)
+PASS  test_slow_drift_below_camera_threshold_is_still  (1.3s)
 PASS  test_empty_and_single_frame  (0.0s)
 PASS  test_two_frames  (0.1s)
 PASS  test_odd_and_tiny_sizes  (0.0s)
 PASS  test_portrait_clip  (0.9s)
-PASS  test_channels_1_and_4_match_3  (1.5s)
+PASS  test_channels_1_and_4_match_3  (1.4s)
 PASS  test_nan_inf_counted_and_input_untouched  (0.6s)
 PASS  test_chunked_conversion_is_identical  (0.1s)
 PASS  test_long_clip_bounded_and_fast  (18.1s)
-PASS  test_other_frame_rates  (4.0s)
-PASS  test_node_outputs_and_passthrough  (0.8s)
+PASS  test_other_frame_rates  (4.5s)
+PASS  test_node_outputs_and_passthrough  (0.9s)
 PASS  test_node_preview_off_and_animated_flag_false  (0.7s)
-PASS  test_preview_size_range_and_no_upscale  (2.7s)
+PASS  test_preview_size_range_and_no_upscale  (2.1s)
+PASS  test_video_input_streams_and_matches_images  (4.4s)
+PASS  test_video_trim_window_is_honoured  (0.4s)
+PASS  test_cropped_video_falls_back_to_comfy_decoder  (0.3s)
+PASS  test_exactly_one_input_required  (0.0s)
+PASS  test_video_stream_never_holds_full_size_frames  (28.5s)
 PASS  test_preview_store_evicts_oldest  (0.0s)
 
-28 passed, 0 failed, 59s
+33 passed, 0 failed, 84s
 ```
 
 Speed on 4 CPU cores:
@@ -153,3 +158,61 @@ fit cached. The tables in sections 2-3 come from the final, uncached run.
   1440 px. Peak memory did not rise above what building the 2 GB test clip itself had already used.
 - **In the browser.** Headless Chromium, real UI, 1080p clip, `preview_size` 1440: the on-node `<video>` plays
   at 1440×810, 3.06 s, verdict `ANIMATED`, and only the moving patch is tinted.
+
+## 6. Windows 10, ComfyUI Desktop (the user's PC), run by a local Claude session
+
+Environment:
+- ComfyUI 0.43.1 Desktop, standalone install "test", started with `--enable-manager --cpu --max-upload-size 1024`.
+- Python 3.13.12, torch 2.12.0+rocm7.14.0, av 19.0.2, numpy 2.5.4.
+- Code: commit 36281b5.
+
+Results:
+- **Unit tests: 28 passed, 0 failed** (253 s; the long-clip test took 94 s of its 120 s budget).
+- **Node loading:** ComfyUI's loader took 0.1 s with no import errors.
+- **`/object_info/MotionVerdict`:** HTTP 200, with the expected inputs and outputs.
+- **API run** (`api_run.py`, port 8188, `example_with_audio.mp4`): `status=success`, verdict `animated`, Preview Any
+  text, a saved JSON and a timeline PNG.
+- **Real clips on that PC:**
+
+  | Clip | Result |
+  |---|---|
+  | `example_with_audio.mp4` | `animated` |
+  | `videoplayback.mp4` | `animated` |
+  | `6319577-uhd_2160_3840_25fps.mp4` (4K portrait, 285 frames) | **failed**: the old test script decoded it into one 28 GB float tensor |
+
+  That failure would also happen to users via *Load Video → Get Video Components*. It led to the streamed
+  `video` input (section 7).
+
+## 7. Streamed VIDEO input (after the Windows report)
+
+- **Unit tests:** 5 new tests:
+  - the same verdict as the IMAGE path, on an animated clip and on a camera-only clip;
+  - the trim window (16 frames from 1 s);
+  - the crop fallback to ComfyUI's decoder;
+  - exactly one input required;
+  - memory, measured in a separate process with a control.
+
+  Result of the memory test on a 32-frame 2560×1440 clip with a 1440 px preview:
+  - streamed VIDEO: **+247 MB**;
+  - the same clip as an IMAGE batch: **+1,771 MB**.
+
+  The control must exceed 75% of the 1,350 MB batch, so the test cannot pass with a broken measurement. It
+  caught one: on Linux, `ru_maxrss` is inherited from the parent process, so the probe now reads `VmHWM`
+  (Linux) or `peak_wset` (Windows).
+- **4K portrait clip** (75 frames, 2160×3840, 25 fps; planted subject + 2 px/frame tilt):
+  - `eval_clips.py` (streaming): `animated`, tilt 1.3%/s; 5.8 s wall time; peak memory of the whole script
+    1,088 MB, against 7,119 MB for one full-size batch.
+  - Real ComfyUI, *Load Video → Motion Verdict*: `success` in 5.0 s; the server's lifetime peak was 1,830 MB
+    (idle before: 1,263 MB).
+  - Real UI: the preview plays at 810×1440.
+- **API, both input paths, real ComfyUI `VideoFromFile`:** `mv_camzoom` → `camera_only` / `camera_only`,
+  `mv_real` → `animated` / `animated`, `mv_still` → `still` / `still` (video input / images input).
+- **Same clips, streamed decoding** (`eval_clips.py` now uses the node's VIDEO reader, where FFmpeg does the
+  shrinking):
+  - Derived clips: **195/195 correct** again. Worst camera-only own motion: 0.000%, against 0.197% via the
+    IMAGE path. FFmpeg's downscaler smooths slightly more (≈ 4 grey levels mean difference at 350 → 320 px).
+  - Real clips: **0 verdict differences** against the IMAGE path on all 230 (229 `animated`, 1
+    `partly_animated`).
+  - Own motion via streaming = **0.98×** the IMAGE-path value (median), 0.93× at the 10th percentile. The extra
+    smoothing removes codec shimmer, not real motion.
+  - The 29 single-frame still images in the folder now decode and come back `unknown` (fewer than 2 frames).
