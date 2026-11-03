@@ -72,6 +72,14 @@ the clean clip; `video + motion overlay` tints in red what moves on its own.
 2. Optional: 10-20 real, labelled good/dead I2V clips in `real_clips/` (gitignored) for a real-failure benchmark.
 3. Optional: a Registry icon (needs a 1.0.1 release); sync `main` with the docs.
 
+## The user's core wish: a "Fast Preview, but for video"
+- **On the user's PC:** Motion Verdict already does it. Connect any VIDEO / IMAGE and it plays a preview on the
+  node from RAM, with no disk or temp file (tested on every video input path, `tests/RESULTS.md` §5, §11, §13).
+- **On RunningHub:** a standalone preview node = the rejected v1.3.1 = a duplicate. Do not build it again. Use
+  existing nodes in a workflow: *Load Video → VHS Video Combine (`save_output` off)*, or KJNodes' preview nodes.
+  Any temp file there lives on RunningHub's server and does not matter to the user. Their exact KJNodes node
+  names / behaviour on RunningHub were not verified (clean room), so check them in RunningHub's node search.
+
 ## Environment notes
 - Cloud sessions cannot reach `registry.comfy.org`, `api.comfy.org` or `cdn.comfy.org`, and cannot see the
   user's PC. Verify those from a session on the PC.
