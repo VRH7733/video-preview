@@ -294,3 +294,17 @@ Judges, comparing every verdict against the previous run:
     against a cut-off of 0.15.
   - Restoring the second tile pass did not change it.
   - It is reported as a knife-edge case. Nothing was tuned to rescue it.
+
+## 10. Final Windows check (the user's PC, commit bfa7eb2)
+
+Setup:
+- Machine: 2-core Ryzen 3 3250U, 5.9 GB RAM, Windows 10.
+- ComfyUI Desktop 0.43.1, started with `--cpu`; Python 3.13.12, torch 2.12.0+rocm7.14.0, av 19.0.2, numpy 2.5.4.
+
+Results:
+- **Unit tests with the ComfyUI server running (worst case): 33 passed, 0 failed.**
+- **4K portrait API run** (`6319577-uhd_2160_3840_25fps.mp4`, 285 frames, VIDEO input, streamed): `success`,
+  verdict `animated`, 24.9 s. The server log shows the prompt in 24.48 s, the node loading in 0.1 s, and no
+  errors or tracebacks.
+- **The same 4K run across commits:** 54.4 s (b4cd6ea) → 41.3 s (a25b1a9) → **24.9 s** (bfa7eb2).
+  - Before the streamed input existed, this clip could not be analysed at all on this PC: a 28 GB IMAGE batch.
