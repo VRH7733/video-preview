@@ -14,4 +14,3 @@ Issues = "https://github.com/VRH7733/ComfyUI-MotionVerdict/issues"
 [tool.comfy]
 PublisherId = "raghav"
 DisplayName = "Motion Verdict"
-Icon = ""

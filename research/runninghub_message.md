@@ -40,8 +40,14 @@ All of these are normal outputs, so it works in API and AI-App runs (e.g. drop s
   - optical-flow packs;
   - loop and seam tools (SeamRank, DaSiWa, Eclipse, WhiteRabbit).
 
-I found no node that gives this verdict. The closest are Motion Mask Tracker (a mask for masking work, no
-verdict) and shotdrift / shotcheck (they check the camera, not the scene).
+I found no node that gives this verdict. In your own node search:
+- The nearest nodes are:
+  - RyanOnTheInside *Motion Feature*: motion from optical flow as an effect-driving signal (its README documents no camera removal);
+  - DepthAnythingV3 *Parse Camera Pose*: camera pose from a depth model.
+
+  Neither removes the camera motion to judge whether the scene itself moves.
+- WAS *Camera Motion Trajectory from Images* does the opposite: it *makes* a camera move over a still image.
+- Motion Mask Tracker, shotdrift, shotcheck, VideoGate and frameaudit do not show up there.
 
 **Dependencies:** only torch, numpy and av. Runs on CPU, makes no network calls, writes nothing outside
 ComfyUI's output folder (and only if `save_report` is on). MIT licence.
@@ -88,8 +94,14 @@ Hunyuan、Kling 等）经常只输出对首帧图片的缓慢推拉或平移，�
   - 光流类插件；
   - 循环和接缝类工具（SeamRank、DaSiWa、Eclipse、WhiteRabbit）。
 
-没有找到给出这种判定的节点。最接近的是 Motion Mask Tracker（用于遮罩处理，不给判定），以及 shotdrift / shotcheck
-（检查的是镜头，不是画面内容）。
+没有找到给出这种判定的节点。在你们的节点搜索里：
+- 最接近的是：
+  - RyanOnTheInside 的 *Motion Feature*：基于光流的运动量，用来驱动特效（其 README 没有提到去除镜头运动）；
+  - DepthAnythingV3 的 *Parse Camera Pose*：由深度模型得到的相机位姿。
+
+  它们都没有先去掉镜头运动，再判断画面本身是否在动。
+- WAS 的 *Camera Motion Trajectory from Images* 正好相反：它是对静止图片*生成*镜头运动。
+- 搜索 Motion Mask Tracker、shotdrift、shotcheck、VideoGate、frameaudit 都没有结果。
 
 **依赖：** 只需要 torch、numpy、av。可在 CPU 上运行，不联网；只有打开 `save_report` 时才会写文件，而且只写到
 ComfyUI 的 output 目录。MIT 许可证。

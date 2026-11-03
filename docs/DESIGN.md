@@ -104,12 +104,12 @@ The `ui` part is stored in ComfyUI's `/history`, so API clients can read the ver
 | analysis long side | 320 px | Phase correlation and normal flow are accurate to well under 1 px here, so 1/320 of the frame is still measurable. Cost is ~1.5 s per 3 s clip on 4 CPU cores. |
 | step | 0.25 s | Slow motion adds up over k frames while per-frame noise does not. A shorter step needs a lower px threshold, which is closer to the codec-noise floor. |
 | `min_speed` | 1.5 %/s | Measured on synthetic clips (`calib` in tests): Gaussian noise σ = 0.04 and 8×8 block artefacts gave residual "motion" above 1.0 %/s but **none above 1.5 %/s**. 1.5 %/s is ~19 px/s on a 1280 px frame: slow, but visible. |
-| `min_area` | 0.3 % | A 36×64 px subject (1% of a 640×360 frame) moving 1-2 px/frame registers 0.41-0.72 %. Real AI clips with only a face changing expression registered 0.52 % (Wan VACE outpainting thumbnail). Camera-only clips derived from real AI frames stayed below it in 76 of 78 cases (see §7). |
+| `min_area` | 0.3 % | A 36×64 px subject (1% of a 640×360 frame) moving 1-2 px/frame registers 0.30-0.61 %. The worst of 78 camera-only clips built from real AI frames registers 0.20 %. The weakest of 230 real AI clips averages 0.14 % but moves 0.3 %+ during its active part (`partly_animated`). |
 | camera threshold | 1.5 %/s at the fastest corner | Below this, a drift reads as "static" to a viewer; above it, a pan or zoom is visible. A 0.5 %/s synthetic drift is classed as `still` (test). |
 | animated / partly | 0.5 / 0.15 of time | "Animated" = it moves most of the time. "Partly" = it clearly moves, but for less than half of the clip (e.g. 1 s of motion, then 2 s frozen = 0.31). |
 | stall | 1.0 s | Shorter pauses are normal (a held pose); 1 s of nothing is noticeable. |
 | `PEAK_MIN` | 0.08 | Phase-correlation peaks of pure noise are ~0.02-0.05. |
-| `GRAD_MIN`, `λ` | see §7 | Set by the real-content sweep. Below the gradient floor, codec shimmer / grey-level noise divided by a tiny gradient looks like large motion. |
+| `GRAD_MIN`, `λ` | 0.01, 0.02 | Set by the real-content sweep (`tests/RESULTS.md` §3). Below the gradient floor, codec shimmer divided by a tiny gradient looks like large motion. At 0.004 / 0.01 the worst camera-only clip showed 0.44 % own motion and 2 of 78 were misjudged; at 0.01 / 0.02 it is 0.20 % and all 195 known-answer clips are right. Larger values started to lose real subtle motion (4-5 errors). |
 | low texture | 2 % of pixels | Below that, nothing can be measured (black or flat frames). |
 
 All thresholds are tuned on synthetic clips and on clips derived from real AI video thumbnails (§7). They are
@@ -157,7 +157,7 @@ from those clips. All variants are re-encoded with H.264, so codec noise is pres
 - 0.8 s of the real clip, then frozen (expected `partly_animated`);
 - the clip itself (expected `animated`).
 
-Results are in the README and in `tests/RESULTS.md`.
+Results are in `tests/RESULTS.md`: 195/195 known-answer clips correct; 229/230 real clips `animated`.
 
 ## 8. Known limits
 
@@ -172,8 +172,8 @@ Results are in the README and in `tests/RESULTS.md`.
 4. **Very slow motion** under `min_speed` (e.g. 1.25 %/s) is not counted, by definition.
 5. Normal flow sees motion across edges only. Motion along an edge, or of a texture-less object, is
    under-counted.
-6. Fine periodic patterns (grids, fabric) under rotation + re-encoding can produce false motion near the
-   threshold. 2 of 78 real-content camera-only clips in calibration were misjudged this way (§7, README).
+6. Fine periodic patterns (grids, fabric) under rotation + re-encoding produce some false motion. The worst
+   case in calibration was 0.20 % against the 0.3 % threshold, so the margin is about 1.5×.
 7. Camera numbers describe the 2-D image motion. Pan vs truck and zoom vs dolly cannot be told apart.
 8. Thresholds were not calibrated on full-resolution user generations. The calibration clips are small
    template thumbnails.

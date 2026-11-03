@@ -58,7 +58,7 @@ const BADGE = /^(ANIMATED|PARTLY_ANIMATED|CAMERA_ONLY|STILL|UNKNOWN):/;
   }
   await page.waitForTimeout(1500);
   for (let i = 0; i < 3; i++) await page.keyboard.press("Escape");
-  await page.evaluate(() => { const app = window.app ?? window.comfyAPI.app.app; app.canvas.ds.offset = [10, -20]; app.canvas.ds.scale = 1; app.graph.setDirtyCanvas(true, true); });
+  await page.evaluate(() => { const app = window.app ?? window.comfyAPI.app.app; app.canvas.ds.offset = [30, 40]; app.canvas.ds.scale = 0.95; app.graph.setDirtyCanvas(true, true); });
   await page.waitForTimeout(800);
   await page.screenshot({ path: shot });
   const state = await page.evaluate((src) => {

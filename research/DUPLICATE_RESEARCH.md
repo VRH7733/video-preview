@@ -151,3 +151,76 @@ Users cannot install nodes on RunningHub; the platform preinstalls them. This co
 e.g. https://zhuanlan.zhihu.com/p/715385255. [likely]
 
 The detection method was not guessed.
+
+## Nodes RunningHub actually has (from the user's screenshots of RunningHub's node search)
+
+Source: screenshots of the RunningHub node search box, taken 2026-11-03.
+- This is the only direct evidence of what RunningHub has installed. [certain for the names shown]
+- Function is judged from each pack's README, or from the description shown in RunningHub's search panel.
+
+### Search term "motion"
+
+| Node (pack) | What it does | Overlap with Motion Verdict |
+|---|---|---|
+| Motion Feature (RyanOnTheInside, FlexFeatures / Sources) | Turns video motion (optical flow) into a "feature" signal that drives effects: masks, IPAdapter, particles. README: "Optical Flow: Generate masks based on motion in videos" | **partial, low**: it measures raw motion amount, camera included, as a modulation signal. No camera removal, no verdict, no still/camera-only classification [certain from README] |
+| Save / Load / Viz MotionBrush (ComfyUI-RAFT) | RAFT optical flow for motion brushes | none: flow for generation [likely] |
+| XY Motion Amplifier (comfyui_cotracker_node) | Amplifies CoTracker point tracks for Wan ATI | none: tracking for generation [certain from README] |
+| Radiance Motion Blur (radiance) | Motion-blur effect. The pack also has a stabilizer and a viewer | none [likely] |
+| LTX Motion Debug Image Stats / Latent Stats (LTX-2-3-LipSync) | debug statistics in an LTX lip-sync workflow | none expected; its pack is not in the Manager index, so the README could not be read [guessing] |
+| MotionCtrl Cond / Sample (+ SVD), Load Motion Traj Preset | camera/object-trajectory **generation** | none [certain] |
+| HY-Motion (Generate, Preview, Encode Text, Export FBX ...) | 3-D human motion generation | none [certain] |
+| MimicMotion, Motion Transfer (Wan Animate 2), Kling Motion Control (RH_OpenAPI), Mesh2Motion, Create 3D Animation File | motion-driven **generation** / 3-D export | none [certain] |
+| WanImageMotion / Pro, WanMotionProTrimmer (IAMCCS); Wan Motion Scale (LongLook) | generation-side motion amplitude / trim | none: they change generation, they do not measure [certain from panel descriptions] |
+| H3 Motion Context / Trim / Chain, H3 Motion Gate, H3 Motion Composite, H3Kit 动作续接 | MiniMax H3 continuation / routing / compositing | none [certain from panel descriptions] |
+| Latent Motion Retime / Sharpener (105-Comfy-nodes) | latent pacing / sharpening | none [certain from panel descriptions] |
+| Motion Blur (virtuoso), Motion Blending (DJZ), Image Motion (dream-project), IG Motion Predictor | effects / interpolation | none [likely] |
+
+**Not seen in the "motion" search:**
+- Code2Collapse Motion Mask Tracker;
+- shotdrift / shotcheck;
+- any node that outputs an animated / still verdict.
+
+Not seeing them under this one search term does **not** prove they are absent. [certain] More search terms to check on RunningHub: `camera`, `mask tracker`, `still`, `static`, `frozen`, `freeze`, `quality`, `QC`, `verdict`, `analy`, `flow`, `stabil`.
+
+### Search term "motion" (second page)
+
+| Node (pack) | What it does (RunningHub panel text or README) | Overlap |
+|---|---|---|
+| H3 Motion Context Seam Probe (H3-Motion-Context) | "Measure a chain join in the graph: does clip B continue clip A's audio, and does the level step at the cut" | none: a seam/join probe for MiniMax H3 chains, not scene motion [certain from panel] |
+| H3 Motion Context Save/Load Latent, H3 Motion Context (ClipStream), H3 运动上下文 (Yuan Tool) | H3 continuation conditioning | none [certain from panel] |
+| LTX Motion Audio Range Extractor / Segmented Audio Loader | LTX lip-sync audio handling | none [certain from panel] |
+| Load Motion Camera Preset (MotionCtrl), Depthflow Motion Arc | generation presets / parallax animation | none [certain] |
+
+### Search term "camera"
+
+| Node (pack) | What it does | Overlap |
+|---|---|---|
+| **Camera Motion Trajectory from Images (WAS_Extras)** | README: "**Generates** a motion camera path over a sequence of images ... (Ken Burns-style moves, rotations, etc.) from stills" | none. It is the inverse of Motion Verdict: it *makes* the camera-move-over-a-still clip that Motion Verdict *detects* [certain from README] |
+| DA3 Parse Camera Pose / DA3 Create Camera Parameters (DepthAnythingV3) | parses camera position/rotation from Depth Anything V3's model output; camera parameters for depth conditioning | partial, low: 3-D camera pose from a depth model. No camera-removed residual motion, no verdict [certain from panel] |
+| Camera Pose Visualizer (KJNodes) | visualises CameraCtrl / RealEstate camera poses | none [certain from panel] |
+| WanCameraEmbedding, WanCameraImageToVideo, WanVideo FunCamera Embeds, XB_/Stack_WanCameraImageToVideo | Wan camera-controlled **generation** | none [certain] |
+| CameraCtrl-Wrapper (CameraJoin/Basic/Run/Combine/Loader/Trajectory), AnimateDiff CameraCtrl poses, Stack Orbit Camera Poses, Replace Camera Parameters | camera-pose **generation** inputs | none [certain] |
+| Sine/Linear Camera Pan/Roll/Zoom (dream-video), Keyframe Camera (Pan & Zoom), Lissajous Camera Shake, 3D Camera Action/Config, Hy-Nomas Camera Keys/Recording, T8 Combat Camera Config, Simple Camera Control v3, dx8152 Camera LoRA | **create** camera moves / shake / prompts | none [certain from panel] |
+| Compose Camera Angle Prompt, Create Camera Info, Camera Shot Presets, Camera Control Prompt Generator, Prompt Styler Camera, Camera View Selector, Camera Pose Qwen Panel, Fisher AnyAngle, Hy3D / Hunyuan 3D camera config | prompt / 3-D view setup | none [certain] |
+| Camera Raw Enhance/Tone Curve, Camera Forensic Realism Engine, ER Camera Defocus, ER Lens Camera Dirt, KK camera grain, Game Boy Camera Style, 相机水印, NOVA Camera Options/Simulator, CamerasGallery_Zho | photo looks / effects | none [certain] |
+
+### Direct searches for the closest packages found in the general research
+
+| Search on RunningHub | Result |
+|---|---|
+| `MaskTrackerMEC` | only "SAM3 Mask Track Boxes" (SAM3-GreenScreen): box tracking from masks; not related |
+| `Motion Mask Tracker` | **No Results** |
+| `Code2Collapse` | **No Results** |
+| `shotdrift` | **No Results** |
+| `shotcheck` | only unrelated version-check nodes (XnanTool 版本检查, Version Check Pixaroma) |
+| `VideoGate` | only core video-latent nodes; no VideoGate |
+| `frameaudit` | only unrelated frame/audio utilities; no frameaudit |
+
+Conclusion for RunningHub specifically [likely, from the screenshots]:
+- The closest public packages (Motion Mask Tracker, shotdrift, shotcheck) are **not installed** on RunningHub.
+- Neither are the frozen-frame QC packs (VideoGate, frameaudit).
+- On RunningHub the nearest neighbours are:
+  - RyanOnTheInside "Motion Feature": raw motion as an effect-driving signal;
+  - DepthAnythingV3 camera pose: model-based camera extrinsics.
+
+  Neither removes camera motion to judge whether the scene itself moves, and neither returns a verdict.

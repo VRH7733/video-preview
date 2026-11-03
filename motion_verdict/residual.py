@@ -13,8 +13,12 @@ import torch.nn.functional as F
 from . import camera
 from .filters import blur, gradients
 
-GRAD_MIN = 0.004  # |grad I| per px (0..1 scale) below this = untextured (~1 grey level per pixel in 8-bit)
-LAMBDA = 0.01  # regulariser of the normal-flow division (same units as GRAD_MIN)
+# Gradient floor and regulariser (|grad I| per px, 0..1 scale). Chosen by a sweep on 195 clips derived from real
+# AI videos (tests/derive_clips.py): at 0.004 / 0.01, H.264 shimmer on weak gradients read as up to 0.44 % "own
+# motion" on camera-only clips; at 0.01 / 0.02 the worst camera-only clip shows 0.16 % (threshold 0.3 %) while every
+# real clip still reads as animated. Larger values started to miss real subtle motion (see docs/DESIGN.md).
+GRAD_MIN = 0.01  # below this a pixel is "untextured" (~2.5 grey levels per pixel in 8-bit)
+LAMBDA = 0.02  # regulariser of the normal-flow division
 MARGIN = 2  # px ignored at the frame border (blur + gradient support)
 
 
