@@ -203,7 +203,7 @@
     16,
     1.5,
     0.3,
-    "video + motion overlay",
+    "video",
     512,
     false,
     ""
@@ -212,7 +212,7 @@
     "fps": 16,
     "min_speed": 1.5,
     "min_area": 0.3,
-    "preview": "video + motion overlay",
+    "preview": "video",
     "preview_size": 512,
     "save_report": false,
     "motion_verdict_preview": ""

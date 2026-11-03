@@ -52,7 +52,8 @@ The full research is in [`research/DUPLICATE_RESEARCH.md`](research/DUPLICATE_RE
    - `video` from *Load Video*. This is best for files, 4K and long clips: the video is **streamed**, each frame is
      shrunk while it is decoded, so the clip never sits in memory at full size. Its own frame rate is used.
    - `images` from *VAE Decode* (or any IMAGE batch). Set `fps` to the clip's frame rate.
-3. Run. The node shows the verdict and a preview, with the parts that move on their own tinted red.
+3. Run. The node shows the verdict and plays a preview of the clip. Set `preview` to `video + motion overlay` to
+   see in red what moves on its own.
 
 Why `video` matters for big files: *Load Video → Get Video Components* turns a clip into a full-size IMAGE batch
 before any node sees it. 285 frames of 4K portrait = 28 GB, which runs out of memory on most PCs. Through the
@@ -77,7 +78,7 @@ found no file created or changed during those runs.
 | `fps` | 16 | frames per second of `images` (Wan 16, LTX 24/25, Hunyuan 24). A `video` uses its own frame rate |
 | `min_speed` | 1.5 | % of the frame per second that a pixel must move, after the camera is removed, to count. Raise it for grainy footage. |
 | `min_area` | 0.3 | % of the (textured) picture that must move for a moment to count as "moving" |
-| `preview` | video + motion overlay | on-node preview: `video + motion overlay`, `video` or `off`. Encoded in memory; nothing is saved, not even to `temp/` |
+| `preview` | video | on-node preview: `video` (the clean clip), `video + motion overlay` (what moves on its own is tinted red) or `off`. Encoded in memory; nothing is saved, not even to `temp/` |
 | `preview_size` | 512 | longest side of the preview, 256-1440 px (never larger than the clip). Does not change the analysis |
 | `save_report` | off | also save the JSON report to `ComfyUI/output/motion_verdict/` |
 
@@ -170,6 +171,9 @@ or on real failed generations; none were available.
 - Writes nothing to disk unless `save_report` is on, and then only into ComfyUI's output folder. Tested: a run with
   `save_report` off created or changed no file anywhere on the disk; the preview MP4 was served from memory.
 - The preview lives in RAM (the last 16 previews, up to 256 MB in total). After a ComfyUI restart, run the node again.
+- The preview is H.264 at crf 20, close to visually lossless, so it works for reference and screenshots. The
+  player's download button saves that preview (≤ `preview_size`), not the original. Use *Save Video* for
+  full-quality files.
 
 ## Install
 `cd ComfyUI/custom_nodes` and `git clone` this repository. Then restart ComfyUI.

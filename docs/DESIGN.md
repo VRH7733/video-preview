@@ -32,7 +32,7 @@ Node id `MotionVerdict` · display name "Motion Verdict (animated / camera-only 
 | `fps` | FLOAT | 16.0 | 1-240, step 0.01 | frame rate of `images` (Wan 16, LTX 24/25). A `video` uses `get_frame_rate()` |
 | `min_speed` | FLOAT | 1.5 | 0.1-50 | % of the frame per second a pixel must move, after camera removal, to count |
 | `min_area` | FLOAT | 0.3 | 0.01-50 | % of the textured picture that must move for a time step to count as moving |
-| `preview` | COMBO | `video + motion overlay` | `video + motion overlay`, `video`, `off` | on-node preview |
+| `preview` | COMBO | `video` | `video`, `video + motion overlay`, `off` | on-node preview: clean clip, or with own motion tinted red |
 | `preview_size` | INT | 512 | 256-1440, step 64 | longest side of the preview (never upscaled; even sizes for yuv420p) |
 | `save_report` | BOOLEAN | False | | also write the JSON to `output/motion_verdict/MotionVerdict_#####_.json` |
 

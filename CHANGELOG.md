@@ -9,8 +9,8 @@ First release of **Motion Verdict** (pack `comfyui-motion-verdict`, node id `Mot
   a `subject_motion` FLOAT, a `timeline` IMAGE, a `report` STRING and a `json` STRING. Stalls (≥ 1 s without
   own motion) are listed with frame numbers.
 - Camera numbers in the report: pan, tilt, zoom, roll, plus how much of the picture agrees with them.
-- Optional on-node preview, encoded to H.264 in memory (nothing saved, not even to `temp/`), 256-1440 px
-  (`preview_size`), with the parts that move on their own tinted red.
+- On-node preview, encoded to H.264 (crf 20) in memory (nothing saved, not even to `temp/`), 256-1440 px
+  (`preview_size`). The default is the clean clip; `video + motion overlay` tints red what moves on its own.
 - Input: an IMAGE batch, or a **VIDEO that is streamed**. FFmpeg shrinks each frame while decoding, so 4K and long
   clips never sit in memory at full size. Cropped / rotated VIDEOs fall back to ComfyUI's decoder. Passthrough
   `images` and `video` outputs.

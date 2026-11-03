@@ -7,7 +7,8 @@ from . import preview as clip_preview
 from .store import PREVIEWS
 from .video_source import VideoStream
 
-PREVIEW_MODES = ("video + motion overlay", "video", "off")
+PREVIEW_VIDEO, PREVIEW_OVERLAY, PREVIEW_OFF = "video", "video + motion overlay", "off"
+PREVIEW_MODES = (PREVIEW_VIDEO, PREVIEW_OVERLAY, PREVIEW_OFF)
 
 
 def streamable(video):
@@ -33,8 +34,8 @@ class MotionVerdict:
         "partly_animated / camera_only / still, plus an 'animated' BOOLEAN for gating seed batches, the "
         "subject-motion score, a timeline chart and a report (also as JSON). Takes an IMAGE batch, or a VIDEO "
         "that is streamed so 4K and long clips never sit in memory at full size. Optional in-memory preview on "
-        "the node (256-1440 px, nothing saved to disk) with the moving parts tinted red. CPU friendly; works in "
-        "API runs without a browser."
+        "the node (256-1440 px, nothing saved to disk), clean or with the moving parts tinted red. CPU friendly; "
+        "works in API runs without a browser."
     )
     CATEGORY = "video/Motion Verdict"
     FUNCTION = "run"
@@ -67,9 +68,10 @@ class MotionVerdict:
                 "min_area": ("FLOAT", {"default": 0.3, "min": 0.01, "max": 50.0, "step": 0.01,
                                        "tooltip": "A moment counts as 'moving' when at least this % of the "
                                                   "(textured) picture moves on its own."}),
-                "preview": (list(PREVIEW_MODES), {"default": PREVIEW_MODES[0],
+                "preview": (list(PREVIEW_MODES), {"default": PREVIEW_VIDEO,
                                                   "tooltip": "Preview on the node, encoded in memory (nothing is "
-                                                             "saved). The overlay tints what moves on its own."}),
+                                                             "saved). 'video' = the clean clip; the overlay mode "
+                                                             "tints red what moves on its own."}),
                 "preview_size": ("INT", {"default": 512, "min": 256, "max": 1440, "step": 64,
                                          "tooltip": "Longest side of the preview in pixels (never larger than "
                                                     "the clip). Does not change the analysis."}),
@@ -105,7 +107,7 @@ class MotionVerdict:
             gray, nonfinite = frames.analysis_frames(source, analysis.ANALYSIS_LONG_SIDE)
             height, width = source.shape[1:3]
 
-        overlay = preview == PREVIEW_MODES[0]
+        overlay = preview == PREVIEW_OVERLAY
         res, masks = analysis.analyze(gray, nonfinite, fps, min_speed, min_area, keep_masks=overlay)
         text = report.text(res, min_speed, min_area)
         data = report.as_json(res, min_speed, min_area)
@@ -113,7 +115,7 @@ class MotionVerdict:
                                   res.step_flat)
         info = {"verdict": res.verdict, "headline": report.HEADLINES[res.verdict], "report": text,
                 "token": None, "saved": None}
-        if preview != PREVIEW_MODES[2] and res.frames > 0:
+        if preview != PREVIEW_OFF and res.frames > 0:
             ph, pw = clip_preview.preview_size(height, width, preview_size)
             chunks = stream.chunks(ph, pw) if stream is not None else clip_preview.image_chunks(source, ph, pw)
             info["token"] = PREVIEWS.put(clip_preview.encode(chunks, fps, ph, pw, masks, res.step))

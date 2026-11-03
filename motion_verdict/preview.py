@@ -12,7 +12,7 @@ import torch.nn.functional as F
 
 from . import frames
 
-CRF = "28"
+CRF = "20"  # close to visually lossless, for screenshots; 1440 px ~ 230 KB/s on a noisy clip (kept in RAM)
 TINT = torch.tensor([1.0, 0.15, 0.1])
 TINT_ALPHA = 0.55
 
