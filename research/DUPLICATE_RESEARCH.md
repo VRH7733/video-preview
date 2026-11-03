@@ -259,3 +259,10 @@ documented. This should be said openly in the request.
 
 Broad terms hit the display cap, and the RAFT Motion Audit did not appear under "RAFT", so a node missing from
 a capped list proves nothing. Terms not yet tried: `camera lock`, `stabilized motion`, `residual flow`.
+
+### Last three terms (user screenshots, 2026-11-03 14:38-14:39)
+
+`camera lock`: **No Results** · `stabilized motion`: **No Results** · `residual flow`: **No Results**.
+
+Final count: 59 terms searched on RunningHub; no node meets all three duplicate criteria. [certain for the
+searched terms]
