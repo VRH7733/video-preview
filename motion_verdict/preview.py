@@ -46,12 +46,14 @@ def encode(chunks, fps, height, width, masks=None, step=1):
         stream.options = {"crf": CRF, "preset": "veryfast"}
         for x in chunks:
             if masks is not None and len(masks):
-                # frame j shows the mask of the pair centred on it
+                # frame j shows the mask of the pair centred on it; tint in place: x = x(1 - a m) + tint a m
                 pair = (torch.arange(done, done + x.shape[0]) - step // 2).clamp(0, len(masks) - 1)
                 m = F.interpolate(masks[pair].float()[:, None], size=(height, width), mode="nearest")[:, 0, ..., None]
-                x = x * (1 - TINT_ALPHA * m) + TINT * (TINT_ALPHA * m)
+                m.mul_(TINT_ALPHA)
+                x.mul_(1 - m).add_(m * TINT)
+                del m
             done += x.shape[0]
-            for f in (x * 255).round().to(torch.uint8).numpy():
+            for f in x.mul_(255).round_().to(torch.uint8).numpy():
                 for packet in stream.encode(av.VideoFrame.from_ndarray(f, format="rgb24")):
                     out.mux(packet)
         for packet in stream.encode():

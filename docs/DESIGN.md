@@ -71,7 +71,7 @@ The `ui` part is stored in ComfyUI's `/history`, so API clients can read the ver
    - Converted in chunks of at most `CHUNK_PIXELS` = 24 M full-size values, so the extra memory is bounded
      for any clip length.
 2. **Pairs:** frames *t* and *t+k* with **k = round(0.25 s × fps)**, clamped to 1..N−1. That gives N−k
-   overlapping pairs, processed 32 at a time.
+   overlapping pairs, processed 16 at a time.
 3. **Camera motion** (`camera.py`, all batched over pairs):
    1. Whole-frame phase correlation with a Hann window gives the coarse shift.
    2. 64 px tiles at half-tile spacing (45 tiles at 320×180). The second frame is warped by the current
@@ -147,14 +147,16 @@ All thresholds are tuned on synthetic clips and on clips derived from real AI vi
 ## 6. Memory plan
 
 - **VIDEO input:** full-size frames exist only inside FFmpeg, one at a time, plus its decoder threads.
-  Measured: 2560×1440 → +247 MB for the whole node run, against +1,771 MB for the same clip as an IMAGE batch.
+  FFmpeg decoding is capped at 4 threads; shrunk frames are turned into tensors 2 M pixels at a time. Measured
+  (32 frames, whole node run, 1440 px preview): 720p +266 MB, 1440p +289 MB. The same 1440p clip as an IMAGE batch
+  adds +2,775 MB.
   4K portrait (75 frames) in ComfyUI: server peak ≤ 0.6 GB above idle, against 7.1 GB for the IMAGE batch.
 - **IMAGE input:** the batch already exists (made by ComfyUI). It is never copied as a whole: at most
   `CHUNK_PIXELS` values are converted at a time.
 - The analysis copy is N × h × w float32, at most 320 px on the long side. Example: 241 frames of 1080p use
   56 MB, against 6 GB for the IMAGE batch itself.
-- Pair processing holds 32 pairs at a time: warped frames, tiles, FFTs, the Gauss-Newton Jacobian
-  (32 × 6 × 57,600 floats = 44 MB).
+- Pair processing holds 16 pairs at a time: warped frames, tiles, FFTs, the Gauss-Newton Jacobian
+  (16 × 6 × 57,600 floats = 22 MB).
 - Moving-pixel masks (bool, analysis size) are kept only when the overlay preview is on.
 - The preview is encoded while streaming: one chunk of frames is downscaled to ≤ `preview_size` (256-1440 px)
   and encoded, then dropped. Measured on 81 frames of 1080p: 0.40 MB at 1440 px; the node adds 3.3 s over the

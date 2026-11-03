@@ -12,7 +12,7 @@ from . import camera, residual
 
 ANALYSIS_LONG_SIDE = 320  # px; analysis frames are at most this big (motion of 1/320 of the frame is still seen)
 STEP_SECONDS = 0.25  # frames are compared this far apart, so slow motion adds up above the noise floor
-PAIR_CHUNK = 32  # frame pairs processed together (bounds memory: ~32 x 320 x 180 floats per buffer)
+PAIR_CHUNK = 16  # frame pairs processed together (bounds memory; 16 vs 32 saves ~70 MB, 8 saves nothing more)
 
 CAMERA_MIN_SPEED = 1.5  # % of the long side per second at the fastest frame corner = "the camera moves"
 ANIMATED_SHARE = 0.5  # share of time steps with own motion needed for "animated"

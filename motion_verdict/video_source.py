@@ -6,6 +6,7 @@ are kept. Trim semantics follow ComfyUI's own decoder: frames with start <= pts 
 """
 
 import io
+import os
 
 import av
 import numpy as np
@@ -13,7 +14,8 @@ import torch
 
 from . import frames
 
-BATCH = 16  # already-shrunk frames turned into one tensor at a time
+CHUNK_PIXELS = 2_000_000  # shrunk pixels turned into one float tensor at a time (24 MB as RGB float32)
+DECODE_THREADS = 4  # FFmpeg's "auto" starts ~one thread per core, each holding frames; capped for predictable memory
 
 
 class VideoStream:
@@ -37,10 +39,12 @@ class VideoStream:
         with self._open() as c:
             s = c.streams.video[0]
             s.thread_type = "AUTO"
+            s.codec_context.thread_count = min(DECODE_THREADS, os.cpu_count() or 1)
             start_pts = int(self.start / s.time_base)
             end_pts = int((self.start + self.duration) / s.time_base)
             if start_pts:
                 c.seek(start_pts, stream=s)
+            batch = max(1, CHUNK_PIXELS // (height * width))
             buf = []
             for f in c.decode(s):
                 if f.pts is not None and f.pts < start_pts:
@@ -48,7 +52,7 @@ class VideoStream:
                 if self.duration and f.pts is not None and f.pts >= end_pts:
                     break
                 buf.append(f.reformat(width=width, height=height, format="rgb24", interpolation="AREA").to_ndarray())
-                if len(buf) == BATCH:
+                if len(buf) == batch:
                     yield torch.from_numpy(np.stack(buf)).float() / 255.0
                     buf = []
             if buf:

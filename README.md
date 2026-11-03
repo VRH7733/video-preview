@@ -56,7 +56,8 @@ The full research is in [`research/DUPLICATE_RESEARCH.md`](research/DUPLICATE_RE
 
 Why `video` matters for big files: *Load Video → Get Video Components* turns a clip into a full-size IMAGE batch
 before any node sees it. 285 frames of 4K portrait = 28 GB, which runs out of memory on most PCs. Through the
-`video` input, the same kind of 4K clip was analysed with about 0.6 GB of extra memory (see Measured results).
+`video` input, the same kind of 4K clip was analysed with under 0.6 GB of extra memory, and streamed memory
+does not grow with resolution (see Measured results).
 
 Example workflow: [`examples/motion_verdict_load_video.json`](examples/motion_verdict_load_video.json). It was
 exported from the ComfyUI UI; pick your own clip in *Load Video*.
@@ -107,12 +108,12 @@ Measured on 4 CPU cores, no GPU. Full output is in [`tests/RESULTS.md`](tests/RE
 
 **Speed and memory**
 - A Wan-size 5 s clip (81 frames at 832×480) takes **2.7 s**.
-- 1,496 frames take 18 s.
+- 1,496 frames take 13.5 s.
 - A **4K portrait clip** (75 frames, 2160×3840) through *Load Video → Motion Verdict* in ComfyUI takes **5.0 s**.
   The server's memory peak stayed at 1.8 GB, i.e. under 0.6 GB above its idle use, while one full-size IMAGE batch
   of that clip would be 7.1 GB.
-- 2560×1440 clip, measured in a separate process: the streamed `video` path adds **+247 MB**; the same clip as an
-  IMAGE batch adds **+1,771 MB**.
+- Streamed `video` memory does not grow with resolution. 32 frames at 720p add **266 MB**; at 1440p (4× the
+  pixels), **289 MB**. The same 1440p clip as an IMAGE batch adds **2,775 MB**.
 
 **Unit tests:** **33/33 pass** on Linux. The earlier 28-test version also passed **28/28 on Windows 10** (ComfyUI
 Desktop 0.43.1, CPU). The tests cover:

@@ -371,49 +371,76 @@ def test_exactly_one_input_required():
 
 
 MEMORY_PROBE = r"""
-import sys, json
+import sys, json, threading
 sys.path[:0] = [sys.argv[1], sys.argv[2]]
 from test_motion_verdict import FakeVideo, node
 
-def peak_mb():  # this process's own high-water mark (Linux ru_maxrss is inherited from the parent, so not used)
-    try:
-        with open("/proc/self/status") as f:  # Linux
-            return next(int(line.split()[1]) for line in f if line.startswith("VmHWM")) / 1024
-    except OSError:  # Windows: peak committed memory (peak working set misses pages Windows compresses or pages out)
-        import psutil
-        return psutil.Process().memory_info().peak_pagefile / 2**20
 
-import torch
-torch.ones(256, 1024, 1024).sum()  # 1 GB spike first, so the peak below is set by the run, not by imports
-del torch
-FakeVideo(sys.argv[3]).get_dimensions()
-before = peak_mb()
+def extra_mb(fn):
+    # Memory the call adds above what the process already uses.
+    try:  # Linux: reset this process's high-water mark, then read it (exact)
+        def status(key):
+            with open("/proc/self/status") as f:
+                return next(int(line.split()[1]) for line in f if line.startswith(key)) / 1024
+        with open("/proc/self/clear_refs", "w") as f:
+            f.write("5")
+        base = status("VmRSS")
+        fn()
+        return status("VmHWM") - base
+    except OSError:  # Windows / macOS: sample committed memory every 2 ms while fn runs
+        import psutil
+        proc = psutil.Process()
+        used = lambda: getattr(proc.memory_info(), "private", proc.memory_info().rss)
+        base, peak, done = used(), [0], threading.Event()
+        def watch():
+            while not done.is_set():
+                peak[0] = max(peak[0], used())
+                done.wait(0.002)
+        t = threading.Thread(target=watch)
+        t.start()
+        fn()
+        done.set()
+        t.join()
+        return (max(peak[0], used()) - base) / 2**20
+
+
+video = FakeVideo(sys.argv[3])
+video.get_dimensions()
+result = {}
 if sys.argv[4] == "video":
-    out = node("video + motion overlay", 1440, video=FakeVideo(sys.argv[3]))
+    mb = extra_mb(lambda: result.update(out=node("video + motion overlay", 1440, video=video)))
 else:  # control: the same clip as one full-size IMAGE batch, as Load Video -> Get Video Components would give
-    out = node("video + motion overlay", 1440, images=FakeVideo(sys.argv[3]).get_components().images)
-print(json.dumps({"extra_mb": peak_mb() - before, "verdict": out["result"][2]}))
+    mb = extra_mb(lambda: result.update(out=node("video + motion overlay", 1440, images=video.get_components().images)))
+print(json.dumps({"extra_mb": mb, "verdict": result["out"]["result"][2]}))
 """
 
 
-def test_video_stream_never_holds_full_size_frames():
+def test_video_stream_memory_does_not_grow_with_resolution():
     import subprocess
 
-    n, h, w = 32, 1440, 2560
-    path = mp4("mv_t_big.mp4", synth.clip(n=n, h=h, w=w, subject=synth.moving_patch(400, 800, (300, 400), 8)))
-    full_mb = n * h * w * 3 * 4 / 2**20  # what one full-size float IMAGE batch of this clip would take
     here = Path(__file__).resolve().parent
+    n = 32
 
-    def probe(mode):
+    def probe(path, mode):
         res = subprocess.run([sys.executable, "-c", MEMORY_PROBE, str(here.parent), str(here), str(path), mode],
                              capture_output=True, text=True, timeout=600)
         assert res.returncode == 0, res.stderr[-2000:]
         return json.loads(res.stdout.strip().splitlines()[-1])
 
-    streamed, control = probe("video"), probe("images")
-    assert streamed["verdict"] == control["verdict"] == "animated", (streamed, control)
-    assert control["extra_mb"] > 0.75 * full_mb, ("the probe cannot see a full-size batch", control, full_mb)
-    assert streamed["extra_mb"] < 0.25 * full_mb, (streamed, full_mb)
+    full, streamed = {}, {}
+    for h, w in ((720, 1280), (1440, 2560)):
+        path = mp4(f"mv_t_{h}p.mp4", synth.clip(n=n, h=h, w=w, subject=synth.moving_patch(h // 4, w // 4, (h // 5, w // 6), 8)))
+        full[h] = n * h * w * 3 * 4 / 2**20  # one full-size float IMAGE batch of this clip
+        streamed[h] = probe(path, "video")
+        assert streamed[h]["verdict"] == "animated", streamed[h]
+    control = probe(path, "images")  # 1440p clip as a full-size IMAGE batch
+    assert control["verdict"] == "animated", control
+    # the probe must be able to see a full-size batch, or the two checks below would prove nothing
+    assert control["extra_mb"] > 0.75 * full[1440], ("probe cannot see a full-size batch", control, full)
+    # 4x the pixels: the streamed run may grow by at most a quarter of what the full-size batch grows by
+    growth = streamed[1440]["extra_mb"] - streamed[720]["extra_mb"]
+    assert growth < 0.25 * (full[1440] - full[720]), (streamed, full)
+    assert streamed[1440]["extra_mb"] < 0.5 * control["extra_mb"], (streamed, control)
 
 
 def test_preview_store_evicts_oldest():
