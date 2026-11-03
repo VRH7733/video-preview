@@ -341,3 +341,30 @@ opt-in; encoding is crf 20. Checks:
   Upload successful".
 - Registry page: https://registry.comfy.org/nodes/comfyui-motion-verdict (id `comfyui-motion-verdict`, publisher
   `raghav`, node active; version 1.0.0 pending at the time of the report).
+
+## 13. Fresh download from GitHub, full re-test (commit ecae002 = published 1.0.0)
+
+**Downloads:**
+- `git clone https://github.com/VRH7733/ComfyUI-MotionVerdict` → `main` = **ecae002**, 37 tracked files.
+- The Registry zip (`cdn.comfy.org`) **could not be downloaded here**: this session's network policy blocks that
+  host. Instead the clone was packed with comfy-cli 1.25.0's `comfy node pack`, the same packer `comfy node
+  publish` uses. The pack has **37 files, identical byte for byte to git `main`**, with none missing or extra.
+
+**Python:** `vermin` finds no violations for Python ≥ 3.10; the shipped code needs Python 3.7 or newer.
+
+**Install:**
+- The pack's contents were copied into `ComfyUI/custom_nodes/ComfyUI-MotionVerdict` as a real folder, replacing
+  the development symlink.
+- ComfyUI's loader showed no import errors. `/object_info` lists **1,035 = 1,034 core + MotionVerdict**: no
+  collision, no core node missing.
+- `/extensions` serves `motion_verdict.js`. The default `preview` is `video`.
+
+| Judge (all run from the downloaded copy) | Result |
+|---|---|
+| Unit tests | **33 passed, 0 failed** (70 s) |
+| API: 3 clips × (`video` input, `images` input) | 6/6 `success`; `camera_only`/`camera_only`, `animated`/`animated`, `still`/`still` |
+| API: 4K portrait (streamed) | `success`, `animated`, 3.7 s |
+| API: Load Video / Create Video codec none / codec auto, `save_report` off | 3/3 `success`; previews 221-625 KB from RAM; **no file created or changed anywhere on disk** |
+| UI: the two **shipped** example `.json` files loaded with `loadGraphData` (as when dragged in) and run | both loaded with no broken nodes; badge `ANIMATED`; clean preview playing; no page errors and no errors from the node's own route |
+| 195 known-answer clips | **194/195**; **0 verdict and 0 numeric differences** from the published run |
+| 230 real clips | **229 animated + 1 partly_animated**; **0 verdict and 0 numeric differences** |
