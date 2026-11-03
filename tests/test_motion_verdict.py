@@ -379,9 +379,9 @@ def peak_mb():  # this process's own high-water mark (Linux ru_maxrss is inherit
     try:
         with open("/proc/self/status") as f:  # Linux
             return next(int(line.split()[1]) for line in f if line.startswith("VmHWM")) / 1024
-    except OSError:  # Windows
+    except OSError:  # Windows: peak committed memory (peak working set misses pages Windows compresses or pages out)
         import psutil
-        return psutil.Process().memory_info().peak_wset / 2**20
+        return psutil.Process().memory_info().peak_pagefile / 2**20
 
 import torch
 torch.ones(256, 1024, 1024).sum()  # 1 GB spike first, so the peak below is set by the run, not by imports
