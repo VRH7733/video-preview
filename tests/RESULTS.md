@@ -308,3 +308,19 @@ Results:
   errors or tracebacks.
 - **The same 4K run across commits:** 54.4 s (b4cd6ea) → 41.3 s (a25b1a9) → **24.9 s** (bfa7eb2).
   - Before the streamed input existed, this clip could not be analysed at all on this PC: a 28 GB IMAGE batch.
+
+## 11. VIDEO from another node, no disk writes
+
+Three ways of feeding a VIDEO were run through real ComfyUI with `preview_size` 1440 and `save_report` off:
+
+| Feed | Result | Preview served from RAM |
+|---|---|---|
+| A: *Load Video → Motion Verdict* | `animated` | 201 KB |
+| B: *Load Video → Get Video Components → Create Video (codec none) → Motion Verdict* (what a generator workflow ends with) | `animated` | 199 KB |
+| C: same, Create Video with `codec` auto (encoded in memory) | `animated` | 199 KB |
+
+- **Disk:** `find / -xdev -newer <mark>` listed **no file created or changed** during the three runs (logs and
+  caches excluded).
+- **Code check:** ComfyUI's `VideoFromComponents` and `VideoFromList` keep or build their data in RAM (`BytesIO`).
+- **UI:** both example workflows were exported from the real frontend and run there: badge `ANIMATED`, on-node
+  preview playing, no page errors.

@@ -59,8 +59,15 @@ before any node sees it. 285 frames of 4K portrait = 28 GB, which runs out of me
 `video` input, the same kind of 4K clip was analysed with under 0.6 GB of extra memory, and streamed memory
 does not grow with resolution (see Measured results).
 
-Example workflow: [`examples/motion_verdict_load_video.json`](examples/motion_verdict_load_video.json). It was
-exported from the ComfyUI UI; pick your own clip in *Load Video*.
+Example workflows (exported from the ComfyUI UI; both use `example_with_audio.mp4` from ComfyUI's input folder):
+- [`examples/motion_verdict_load_video.json`](examples/motion_verdict_load_video.json): *Load Video → Motion
+  Verdict → Preview as Text*.
+- [`examples/motion_verdict_video_from_another_node.json`](examples/motion_verdict_video_from_another_node.json):
+  *Load Video → Get Video Components → Create Video → Motion Verdict*. This is the "VIDEO output of another node"
+  case, e.g. the end of a Wan workflow.
+
+Tested: Load Video, and Create Video with `codec` none or auto, all play the preview on the node. A full-disk scan
+found no file created or changed during those runs.
 
 ### Inputs
 | Input | Default | Meaning |

@@ -1,5 +1,5 @@
 {
- "id": "5745969f-3d39-48ea-bb0a-1faaa754f735",
+ "id": "236cb9ee-c1a1-45f6-ac93-b49e7dddeb8e",
  "revision": 0,
  "last_node_id": 3,
  "last_link_id": 2,
@@ -52,11 +52,11 @@
     "Node name for S&R": "LoadVideo"
    },
    "widgets_values": [
-    "mv_real.mp4",
+    "example_with_audio.mp4",
     "image"
    ],
    "widgets_values_named": {
-    "file": "mv_real.mp4",
+    "file": "example_with_audio.mp4",
     "upload": "image"
    }
   },
