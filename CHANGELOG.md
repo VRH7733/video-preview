@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0 (unreleased)
+## 1.0.0 (2026-11-03)
 First release of **Motion Verdict** (pack `comfyui-motion-verdict`, node id `MotionVerdict`).
 
 - Removes the camera's global motion (robust affine fit: phase-correlated tiles, then a Gauss-Newton polish) and

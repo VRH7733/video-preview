@@ -324,3 +324,20 @@ Three ways of feeding a VIDEO were run through real ComfyUI with `preview_size` 
 - **Code check:** ComfyUI's `VideoFromComponents` and `VideoFromList` keep or build their data in RAM (`BytesIO`).
 - **UI:** both example workflows were exported from the real frontend and run there: badge `ANIMATED`, on-node
   preview playing, no page errors.
+
+## 12. Clean default preview, and publishing
+
+**Clean default preview** (commit c4c8339): `preview` defaults to `video`, the clean clip, and the red overlay is
+opt-in; encoding is crf 20. Checks:
+- **ComfyUI:** the server lists `['video', 'video + motion overlay', 'off']` with default `video`.
+- **UI:** both example workflows were re-exported from the real UI with that default and run there: badge
+  `ANIMATED`, the clean preview playing (screenshot `assets/preview_clean.png`), no page errors.
+- **Disk:** no file was created or changed in ComfyUI's folders or `/tmp` during those runs. Chromium's own
+  profile and the logs were excluded.
+
+**Published** (by the user's local session from commit ecae002):
+- GitHub: https://github.com/VRH7733/ComfyUI-MotionVerdict (public).
+- Comfy Registry: workflow run 41637314810 succeeded in 26 s, with "All validation checks passed successfully …
+  Upload successful".
+- Registry page: https://registry.comfy.org/nodes/comfyui-motion-verdict (id `comfyui-motion-verdict`, publisher
+  `raghav`, node active; version 1.0.0 pending at the time of the report).

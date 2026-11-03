@@ -9,9 +9,13 @@ stalls. Frozen-frame checks miss the zoom-over-a-still case, because the pixels 
 **Motion Verdict removes the camera motion (pan, tilt, zoom, roll) first, then measures what still moves on its
 own.**
 
-| Real Wan clip → `ANIMATED` (what moves on its own is tinted red) | The same clip's first frame with only a zoom + pan → `CAMERA_ONLY` |
+| Real Wan clip → `ANIMATED` (overlay mode: what moves on its own is tinted red) | The same clip's first frame with only a zoom + pan → `CAMERA_ONLY` |
 |---|---|
 | ![animated](assets/screenshot.png) | ![camera only](assets/camera_only.png) |
+
+The default preview is the clean clip, played on the node from memory (nothing saved to disk):
+
+![default clean preview](assets/preview_clean.png)
 
 | Verdict | Meaning |
 |---|---|
@@ -176,7 +180,11 @@ or on real failed generations; none were available.
   full-quality files.
 
 ## Install
-`cd ComfyUI/custom_nodes` and `git clone` this repository. Then restart ComfyUI.
+- **Comfy Registry / ComfyUI-Manager:** search for **Motion Verdict**, or run `comfy node install comfyui-motion-verdict`
+  (https://registry.comfy.org/nodes/comfyui-motion-verdict).
+- **git:** `cd ComfyUI/custom_nodes` and `git clone https://github.com/VRH7733/ComfyUI-MotionVerdict`.
+
+Then restart ComfyUI.
 
 ## Tests
 - `python tests/test_motion_verdict.py`: known-answer tests with planted camera moves and moving subjects,
