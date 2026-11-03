@@ -1,6 +1,6 @@
 # Message for RunningHub #feature-requests (DRAFT: not posted)
 
-Post only after the public repo exists and the links below work. Replace `<REPO_URL>` and `<SCREENSHOT_URL>`.
+Post only after the public repo exists and the links below work. Replace `https://github.com/VRH7733/ComfyUI-MotionVerdict` and `https://github.com/VRH7733/ComfyUI-MotionVerdict/blob/main/assets/camera_only.png (camera only) and https://github.com/VRH7733/ComfyUI-MotionVerdict/blob/main/assets/screenshot.png (animated)`.
 
 ---
 
@@ -16,7 +16,7 @@ Easy-Media and BFS Video Compare already do that. Its later version, **v2.0.0 (p
 overlaps with existing nodes (comfyui-frameaudit, ComfyUI-VideoGate, BFS Video Compare), so I am **not**
 requesting it.
 
-I am asking about a **different function** instead: **Motion Verdict** (`MotionVerdict`), <REPO_URL>
+I am asking about a **different function** instead: **Motion Verdict** (`MotionVerdict`), https://github.com/VRH7733/ComfyUI-MotionVerdict
 
 **What it does:** it tells you whether an AI video is actually animated, or only a camera move over a still
 picture. Image-to-video models (Wan, LTX, MiniMax, Hunyuan, Kling ...) often return a slow zoom or pan over the
@@ -60,7 +60,7 @@ I found no node that gives this verdict. In your own node search:
 **Dependencies:** only torch, numpy and av. Runs on CPU, makes no network calls, writes nothing outside
 ComfyUI's output folder (and only if `save_report` is on). MIT licence.
 
-Screenshot: <SCREENSHOT_URL>
+Screenshot: https://github.com/VRH7733/ComfyUI-MotionVerdict/blob/main/assets/camera_only.png (camera only) and https://github.com/VRH7733/ComfyUI-MotionVerdict/blob/main/assets/screenshot.png (animated)
 
 If this still counts as duplicate functionality, could you tell me **which installed node you see as
 equivalent**? And what would you need to see for a node to be accepted? Thank you!
@@ -79,7 +79,7 @@ RunningHub 团队你好：
 BFS Video Compare 已经有这些功能。它的后续版本 **v2.0.0（逐帧质检）** 也与现有节点重叠（comfyui-frameaudit、
 ComfyUI-VideoGate、BFS Video Compare），所以我**不**申请它。
 
-这次申请的是一个**不同的功能**：**Motion Verdict**（`MotionVerdict`），<REPO_URL>
+这次申请的是一个**不同的功能**：**Motion Verdict**（`MotionVerdict`），https://github.com/VRH7733/ComfyUI-MotionVerdict
 
 **它做什么：** 判断一段 AI 视频是真的在动，还是只是对一张静止画面做镜头运动。图生视频模型（Wan、LTX、MiniMax、
 Hunyuan、Kling 等）经常只输出对首帧图片的缓慢推拉或平移，画面里没有任何东西在动。冻结帧检测会把这种片段判为正常，
@@ -120,7 +120,7 @@ Hunyuan、Kling 等）经常只输出对首帧图片的缓慢推拉或平移，�
 **依赖：** 只需要 torch、numpy、av。可在 CPU 上运行，不联网；只有打开 `save_report` 时才会写文件，而且只写到
 ComfyUI 的 output 目录。MIT 许可证。
 
-截图：<SCREENSHOT_URL>
+截图：https://github.com/VRH7733/ComfyUI-MotionVerdict/blob/main/assets/camera_only.png (camera only) and https://github.com/VRH7733/ComfyUI-MotionVerdict/blob/main/assets/screenshot.png (animated)
 
 如果你们仍然认为功能重复，能否告诉我**你们认为哪个已安装的节点与它等效**？另外，一个节点需要满足哪些条件才会被接受？
 谢谢！
