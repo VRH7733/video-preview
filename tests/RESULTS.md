@@ -368,3 +368,17 @@ opt-in; encoding is crf 20. Checks:
 | UI: the two **shipped** example `.json` files loaded with `loadGraphData` (as when dragged in) and run | both loaded with no broken nodes; badge `ANIMATED`; clean preview playing; no page errors and no errors from the node's own route |
 | 195 known-answer clips | **194/195**; **0 verdict and 0 numeric differences** from the published run |
 | 230 real clips | **229 animated + 1 partly_animated**; **0 verdict and 0 numeric differences** |
+
+## 14. The real Registry zip (checked on the user's PC; `cdn.comfy.org` is blocked in this session)
+
+- **Download:** `https://cdn.comfy.org/raghav/comfyui-motion-verdict/1.0.0/node.zip` is **795,901 bytes**. That is
+  exactly the size of the pack rebuilt in this session from `ecae002` with `comfy node pack` (§13).
+- **Comparison with a fresh `git clone` at `ecae002` (`.git` ignored):**
+  - 37 files on both sides; none only in the zip, none only in git.
+  - 4 files are byte-identical (3 PNGs, the .xlsx). The other 33 differ only in line endings: the zip has LF,
+    while the Windows checkout used CRLF because of `core.autocrlf=true`. **0 real content differences.**
+- **Registry page:** Motion Verdict, @raghav, v1.0.0 (the only version), released 2026-11-03. It offers "Download
+  Version 1.0.0" and shows no pending or flagged badge to logged-out visitors.
+
+All three install routes are therefore verified for 1.0.0: GitHub clone, Comfy Registry zip, and
+ComfyUI-Manager / `comfy node install`, which installs the same Registry zip.
