@@ -15,7 +15,7 @@ class MotionVerdict:
         "global motion (pan, tilt, zoom, roll) and measures what still moves on its own. Verdict: animated / "
         "partly_animated / camera_only / still, plus an 'animated' BOOLEAN for gating seed batches, the "
         "subject-motion score, a timeline chart and a report (also as JSON). Optional in-memory preview on the "
-        "node with the moving parts tinted red. CPU friendly; works in API runs without a browser."
+        "node (256-1440 px, nothing saved to disk) with the moving parts tinted red. CPU friendly; works in API runs without a browser."
     )
     CATEGORY = "video/Motion Verdict"
     FUNCTION = "run"
@@ -49,15 +49,18 @@ class MotionVerdict:
                                        "tooltip": "A moment counts as 'moving' when at least this % of the "
                                                   "(textured) picture moves on its own."}),
                 "preview": (list(PREVIEW_MODES), {"default": PREVIEW_MODES[0],
-                                                  "tooltip": "Small preview on the node, encoded in memory. "
-                                                             "The overlay tints what moves on its own."}),
+                                                  "tooltip": "Preview on the node, encoded in memory (nothing is "
+                                                             "saved). The overlay tints what moves on its own."}),
+                "preview_size": ("INT", {"default": 512, "min": 256, "max": 1440, "step": 64,
+                                         "tooltip": "Longest side of the preview in pixels (never larger than "
+                                                    "the clip). Does not change the analysis."}),
                 "save_report": ("BOOLEAN", {"default": False,
                                             "tooltip": "Also save the JSON report in ComfyUI's output folder "
                                                        "(output/motion_verdict/)."}),
             },
         }
 
-    def run(self, images, fps, min_speed, min_area, preview, save_report):
+    def run(self, images, fps, min_speed, min_area, preview, preview_size, save_report):
         overlay = preview == PREVIEW_MODES[0]
         res, masks = analysis.analyze(images, fps, min_speed, min_area, keep_masks=overlay)
         text = report.text(res, min_speed, min_area)
@@ -67,7 +70,7 @@ class MotionVerdict:
         info = {"verdict": res.verdict, "headline": report.HEADLINES[res.verdict], "report": text,
                 "token": None, "saved": None}
         if preview != PREVIEW_MODES[2] and res.frames > 0:
-            info["token"] = PREVIEWS.put(encode_preview(images, fps, masks, res.step))
+            info["token"] = PREVIEWS.put(encode_preview(images, fps, preview_size, masks, res.step))
         if save_report:
             info["saved"] = save_json(data)
         return {"ui": {"motion_verdict": [info]},

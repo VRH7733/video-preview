@@ -202,7 +202,7 @@ def test_nan_inf_counted_and_input_untouched():
     v[3, 10:20, 10:20, 0] = float("nan")
     v[5, 0, 0, 1] = float("inf")
     before = v.clone()
-    out = MotionVerdict().run(v, FPS, MIN_SPEED, MIN_AREA, "off", False)["result"]
+    out = MotionVerdict().run(v, FPS, MIN_SPEED, MIN_AREA, "off", 512, False)["result"]
     assert out[0] is v
     assert torch.equal(torch.isnan(v), torch.isnan(before)) and torch.equal(v.nan_to_num(), before.nan_to_num())
     data = json.loads(out[6])
@@ -244,7 +244,7 @@ def test_other_frame_rates():
 
 def test_node_outputs_and_passthrough():
     v = synth.clip(n=33, h=180, w=320, subject=PATCH)
-    out = MotionVerdict().run(v, FPS, MIN_SPEED, MIN_AREA, "video + motion overlay", False)
+    out = MotionVerdict().run(v, FPS, MIN_SPEED, MIN_AREA, "video + motion overlay", 512, False)
     images, verdict, animated, subject, timeline, text, data = out["result"]
     assert images is v
     assert verdict == "animated" and animated is True and isinstance(subject, float)
@@ -263,9 +263,24 @@ def test_node_outputs_and_passthrough():
 
 def test_node_preview_off_and_animated_flag_false():
     v = synth.clip(n=33, h=180, w=320, cam=lambda i: (0, 0, 1.05 ** (i / FPS), 0))
-    out = MotionVerdict().run(v, FPS, MIN_SPEED, MIN_AREA, "off", False)
+    out = MotionVerdict().run(v, FPS, MIN_SPEED, MIN_AREA, "off", 512, False)
     assert out["ui"]["motion_verdict"][0]["token"] is None
     assert out["result"][1] == "camera_only" and out["result"][2] is False
+
+
+def test_preview_size_range_and_no_upscale():
+    def size_of(clip):
+        with av.open(io.BytesIO(clip)) as c:
+            s = c.streams.video[0]
+            return s.width, s.height, sum(1 for _ in c.decode(s))
+
+    big = synth.clip(n=9, h=1080, w=1920, subject=PATCH)
+    for side, expect in ((1440, (1440, 810)), (256, (256, 144))):
+        out = MotionVerdict().run(big, FPS, MIN_SPEED, MIN_AREA, "video + motion overlay", side, False)
+        assert size_of(PREVIEWS.get(out["ui"]["motion_verdict"][0]["token"])) == (*expect, 9), side
+    small = synth.clip(n=9, h=181, w=321)  # odd size, smaller than the preview: kept, rounded down to even
+    out = MotionVerdict().run(small, FPS, MIN_SPEED, MIN_AREA, "video", 1440, False)
+    assert size_of(PREVIEWS.get(out["ui"]["motion_verdict"][0]["token"])) == (320, 180, 9)
 
 
 def test_preview_store_evicts_oldest():

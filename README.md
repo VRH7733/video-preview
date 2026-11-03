@@ -62,7 +62,8 @@ exported from the ComfyUI UI; pick your own clip in *Load Video*.
 | `fps` | 16 | frames per second (Wan 16, LTX 24/25, Hunyuan 24) |
 | `min_speed` | 1.5 | % of the frame per second that a pixel must move, after the camera is removed, to count. Raise it for grainy footage. |
 | `min_area` | 0.3 | % of the (textured) picture that must move for a moment to count as "moving" |
-| `preview` | video + motion overlay | on-node preview: `video + motion overlay`, `video` or `off` |
+| `preview` | video + motion overlay | on-node preview: `video + motion overlay`, `video` or `off`. Encoded in memory; nothing is saved, not even to `temp/` |
+| `preview_size` | 512 | longest side of the preview, 256-1440 px (never larger than the clip). Does not change the analysis |
 | `save_report` | off | also save the JSON report to `ComfyUI/output/motion_verdict/` |
 
 ### Outputs
@@ -134,7 +135,9 @@ or on real failed generations; none were available.
 - ComfyUI (tested with 0.43.0, frontend 1.57.6).
 - Only `torch`, `numpy` and `av` (PyAV), which ComfyUI already installs. No other pip packages.
 - Works on CPU-only machines. No network access.
-- Writes nothing to disk unless `save_report` is on, and then only into ComfyUI's output folder.
+- Writes nothing to disk unless `save_report` is on, and then only into ComfyUI's output folder. Tested: a run with
+  `save_report` off created or changed no file anywhere on the disk; the preview MP4 was served from memory.
+- The preview lives in RAM (the last 16 previews, up to 256 MB in total). After a ComfyUI restart, run the node again.
 
 ## Install
 `cd ComfyUI/custom_nodes` and `git clone` this repository. Then restart ComfyUI.

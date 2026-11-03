@@ -1,5 +1,5 @@
 {
- "id": "edf48bc1-cfd7-40b1-ab6a-ba509441e81f",
+ "id": "3ec3e87f-c515-4115-8008-45c698dc6c60",
  "revision": 0,
  "last_node_id": 4,
  "last_link_id": 4,
@@ -180,6 +180,15 @@
      "link": null
     },
     {
+     "localized_name": "preview_size",
+     "name": "preview_size",
+     "type": "INT",
+     "widget": {
+      "name": "preview_size"
+     },
+     "link": null
+    },
+    {
      "localized_name": "save_report",
      "name": "save_report",
      "type": "BOOLEAN",
@@ -243,6 +252,7 @@
     1.5,
     0.3,
     "video + motion overlay",
+    512,
     false,
     ""
    ],
@@ -251,6 +261,7 @@
     "min_speed": 1.5,
     "min_area": 0.3,
     "preview": "video + motion overlay",
+    "preview_size": 512,
     "save_report": false,
     "motion_verdict_preview": ""
    }

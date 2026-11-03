@@ -28,7 +28,7 @@ def workflow(video):
         "2": {"class_type": "GetVideoComponents", "inputs": {"video": ["1", 0]}},
         "3": {"class_type": "MotionVerdict", "inputs": {
             "images": ["2", 0], "fps": ["2", 2], "min_speed": 1.5, "min_area": 0.3,
-            "preview": "video + motion overlay", "save_report": True}},
+            "preview": "video + motion overlay", "preview_size": 512, "save_report": True}},
         "4": {"class_type": "PreviewAny", "inputs": {"source": ["3", 5]}},
         "5": {"class_type": "SaveImage", "inputs": {"images": ["3", 4], "filename_prefix": "motion_verdict/timeline"}},
     }

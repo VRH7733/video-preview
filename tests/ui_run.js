@@ -1,6 +1,7 @@
 // Drive the real ComfyUI frontend in headless Chromium (Playwright for Node).
 //
 //   node tests/ui_run.js <video in ComfyUI/input> <screenshot.png> [<exported_workflow.json>] [--url URL]
+//                        [--preview-size N]
 //
 // Builds Load Video -> Get Video Components -> Motion Verdict -> Preview Any in the page, exports the workflow
 // the way the UI saves it, queues it, waits for the verdict badge and the on-node preview video, takes a
@@ -11,6 +12,8 @@ const { chromium } = require("playwright");
 const args = process.argv.slice(2);
 const urlAt = args.indexOf("--url");
 const url = urlAt >= 0 ? args.splice(urlAt, 2)[1] : "http://127.0.0.1:8188";
+const sizeAt = args.indexOf("--preview-size");
+const previewSize = sizeAt >= 0 ? Number(args.splice(sizeAt, 2)[1]) : null;
 const [video, shot, wfPath] = args;
 const BADGE = /^(ANIMATED|PARTLY_ANIMATED|CAMERA_ONLY|STILL|UNKNOWN):/;
 
@@ -26,7 +29,7 @@ const BADGE = /^(ANIMATED|PARTLY_ANIMATED|CAMERA_ONLY|STILL|UNKNOWN):/;
   await page.waitForFunction(() => (window.app ?? window.comfyAPI?.app?.app)?.graph, null, { timeout: 120000 });
   await page.waitForTimeout(3000);
   for (let i = 0; i < 3; i++) await page.keyboard.press("Escape"); // close the first-run templates dialog
-  const wf = await page.evaluate((file) => {
+  const wf = await page.evaluate(([file, size]) => {
     const app = window.app ?? window.comfyAPI.app.app;
     app.graph.clear();
     const add = (type, x, y) => { const n = LiteGraph.createNode(type); n.pos = [x, y]; app.graph.add(n); return n; };
@@ -35,6 +38,7 @@ const BADGE = /^(ANIMATED|PARTLY_ANIMATED|CAMERA_ONLY|STILL|UNKNOWN):/;
     const mv = add("MotionVerdict", 400, 60);
     const show = add("PreviewAny", 880, 60);
     load.widgets.find((w) => w.name === "file").value = file;
+    if (size) mv.widgets.find((w) => w.name === "preview_size").value = size;
     load.connect(0, parts, 0);
     parts.connect(0, mv, 0);
     parts.connect(2, mv, mv.inputs.findIndex((i) => i.name === "fps"));
@@ -43,7 +47,7 @@ const BADGE = /^(ANIMATED|PARTLY_ANIMATED|CAMERA_ONLY|STILL|UNKNOWN):/;
     show.setSize([520, 300]);
     app.graph.setDirtyCanvas(true, true);
     return JSON.stringify(app.graph.serialize(), null, 1);
-  }, video);
+  }, [video, previewSize]);
   if (wfPath) fs.writeFileSync(wfPath, wf + "\n");
   await page.evaluate(() => (window.app ?? window.comfyAPI.app.app).queuePrompt(0, 1));
   let ok = true;

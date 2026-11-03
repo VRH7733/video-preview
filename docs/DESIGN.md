@@ -32,6 +32,7 @@ Node id `MotionVerdict` · display name "Motion Verdict (animated / camera-only 
 | `min_speed` | FLOAT | 1.5 | 0.1-50 | % of the frame per second a pixel must move, after camera removal, to count |
 | `min_area` | FLOAT | 0.3 | 0.01-50 | % of the textured picture that must move for a time step to count as moving |
 | `preview` | COMBO | `video + motion overlay` | `video + motion overlay`, `video`, `off` | on-node preview |
+| `preview_size` | INT | 512 | 256-1440, step 64 | longest side of the preview (never upscaled; even sizes for yuv420p) |
 | `save_report` | BOOLEAN | False | | also write the JSON to `output/motion_verdict/MotionVerdict_#####_.json` |
 
 | # | Output | Type | Content |
@@ -139,8 +140,9 @@ All thresholds are tuned on synthetic clips and on clips derived from real AI vi
 - Pair processing holds 32 pairs at a time: warped frames, tiles, FFTs, the Gauss-Newton Jacobian
   (32 × 6 × 57,600 floats = 44 MB).
 - Moving-pixel masks (bool, analysis size) are kept only when the overlay preview is on.
-- The preview is encoded while streaming: one chunk of frames is downscaled to ≤ 512 px and encoded, then
-  dropped. The finished MP4 lives in an in-memory store: 16 clips / 256 MB, least recently used out first.
+- The preview is encoded while streaming: one chunk of frames is downscaled to ≤ `preview_size` (256-1440 px)
+  and encoded, then dropped. Measured on 81 frames of 1080p: 0.40 MB at 1440 px; the node adds 3.3 s over the
+  512 px setting. The finished MP4 lives in an in-memory store: 16 clips / 256 MB, least recently used out first.
 - Nothing is written to disk unless `save_report` is on, and then only into ComfyUI's output folder.
 
 ## 7. Calibration data (what was actually measured)

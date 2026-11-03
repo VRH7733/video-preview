@@ -33,9 +33,10 @@ PASS  test_long_clip_bounded_and_fast  (18.1s)
 PASS  test_other_frame_rates  (4.0s)
 PASS  test_node_outputs_and_passthrough  (0.8s)
 PASS  test_node_preview_off_and_animated_flag_false  (0.7s)
+PASS  test_preview_size_range_and_no_upscale  (2.7s)
 PASS  test_preview_store_evicts_oldest  (0.0s)
 
-27 passed, 0 failed, 50s
+28 passed, 0 failed, 59s
 ```
 
 Speed on 4 CPU cores:
@@ -136,3 +137,19 @@ fit cached. The tables in sections 2-3 come from the final, uncached run.
     on-node `<video>` (blob URL, `readyState ≥ 2`).
   - Every console 404 came from ComfyUI's own requests (user.css, userdata, update check, template model
     downloads). None came from this node.
+
+## 5. Preview: disk-free and 256-1440 px
+
+- **No disk writes.**
+  - A full ComfyUI run (Load Video → Get Video Components → Motion Verdict, `save_report` off) returned
+    `success`.
+  - The 204 KB preview MP4 was served from memory by `/motion_verdict/preview/<token>`.
+  - `find / -xdev -newer <mark>` listed **no file created or changed anywhere on the disk** during the run
+    (logs excluded), including ComfyUI's `temp/` and `output/`.
+- **Preview size.** `test_preview_size_range_and_no_upscale`:
+  - 1080p input → 1440×810 at 1440 and 256×144 at 256;
+  - a 321×181 input stays 320×180 (no upscale; even sizes).
+- **Cost.** 81 frames of 1080p take 7.1 s in total at 512 px and 10.4 s at 1440 px; the preview is 0.40 MB at
+  1440 px. Peak memory did not rise above what building the 2 GB test clip itself had already used.
+- **In the browser.** Headless Chromium, real UI, 1080p clip, `preview_size` 1440: the on-node `<video>` plays
+  at 1440×810, 3.06 s, verdict `ANIMATED`, and only the moving patch is tinted.
