@@ -108,7 +108,7 @@ Measured on 4 CPU cores, no GPU. Full output is in [`tests/RESULTS.md`](tests/RE
 
 **Speed and memory**
 - A Wan-size 5 s clip (81 frames at 832×480) takes **2.7 s**.
-- 1,496 frames take 13.5 s.
+- 1,496 frames take 8.8 s on 4 cores; 9.2 s with only 2 threads.
 - A **4K portrait clip** (75 frames, 2160×3840) through *Load Video → Motion Verdict* in ComfyUI takes **5.0 s**.
   The server's memory peak stayed at 1.8 GB, i.e. under 0.6 GB above its idle use, while one full-size IMAGE batch
   of that clip would be 7.1 GB.
@@ -128,7 +128,9 @@ Desktop 0.43.1, CPU). The tests cover:
   `animated` **229/230**. These are the animated thumbnails that ship with ComfyUI's templates, ≤ 512 px.
 - The one exception (`partly_animated`) is a portrait that is motionless for its first 2.2 s.
 
-**Known-answer clips built from real AI frames, re-encoded with H.264: 195/195 correct.** 39 of each:
+**Known-answer clips built from real AI frames, re-encoded with H.264: 194/195 correct** with the current, faster
+code (195/195 before the speed-up). The one miss is a knife-edge case: a clip with only ~0.3 s of motion whose
+moving share is 0.146 against the 0.15 cut-off; see `tests/RESULTS.md` §9. 39 of each:
 - held frame → `still`;
 - zoom + pan over the frame → `camera_only`;
 - pan + tilt + roll over the frame → `camera_only`;
@@ -136,7 +138,7 @@ Desktop 0.43.1, CPU). The tests cover:
 - the real clip → `animated`.
 
 Both inputs agree: through the streamed `video` reader the same 230 real clips gave **0 different verdicts**, and
-the 195 known-answer clips were again 195/195.
+the 195 known-answer clips were again 195/195 (before the speed-up).
 
 **Thresholds are calibrated only on these clips.** They were **not** calibrated on full-resolution generations
 or on real failed generations; none were available.

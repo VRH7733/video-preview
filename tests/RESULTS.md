@@ -7,41 +7,41 @@ Environment:
 ## 1. Unit / known-answer / edge-case tests: `python tests/test_motion_verdict.py`
 
 ```
-PASS  test_still_clip_is_still  (1.5s)
-PASS  test_pan_right_is_camera_only_with_correct_sign_and_speed  (1.2s)
-PASS  test_tilt_up_and_down  (2.7s)
-PASS  test_zoom_in_and_out  (2.8s)
-PASS  test_roll_sign  (1.4s)
-PASS  test_combined_camera_move_over_still_picture_8bit  (1.5s)
-PASS  test_moving_subject_static_camera_is_animated  (1.4s)
-PASS  test_moving_subject_with_pan_and_with_zoom  (2.5s)
-PASS  test_small_subject_is_found  (1.1s)
-PASS  test_motion_that_stops_is_partly_animated_with_a_stall  (1.2s)
-PASS  test_clip_that_starts_moving_late_reports_the_stall_at_the_start  (1.4s)
-PASS  test_noise_and_flicker_on_a_still_picture_are_still  (1.2s)
-PASS  test_noise_on_camera_move_is_camera_only  (1.1s)
+PASS  test_still_clip_is_still  (0.9s)
+PASS  test_pan_right_is_camera_only_with_correct_sign_and_speed  (0.9s)
+PASS  test_tilt_up_and_down  (1.6s)
+PASS  test_zoom_in_and_out  (1.5s)
+PASS  test_roll_sign  (0.8s)
+PASS  test_combined_camera_move_over_still_picture_8bit  (1.1s)
+PASS  test_moving_subject_static_camera_is_animated  (0.7s)
+PASS  test_moving_subject_with_pan_and_with_zoom  (1.4s)
+PASS  test_small_subject_is_found  (0.7s)
+PASS  test_motion_that_stops_is_partly_animated_with_a_stall  (0.8s)
+PASS  test_clip_that_starts_moving_late_reports_the_stall_at_the_start  (0.9s)
+PASS  test_noise_and_flicker_on_a_still_picture_are_still  (0.7s)
+PASS  test_noise_on_camera_move_is_camera_only  (0.7s)
 PASS  test_black_clip_is_still_with_a_note  (0.0s)
-PASS  test_slow_drift_below_camera_threshold_is_still  (1.2s)
+PASS  test_slow_drift_below_camera_threshold_is_still  (0.7s)
 PASS  test_empty_and_single_frame  (0.0s)
 PASS  test_two_frames  (0.0s)
 PASS  test_odd_and_tiny_sizes  (0.0s)
-PASS  test_portrait_clip  (0.8s)
-PASS  test_channels_1_and_4_match_3  (1.3s)
-PASS  test_nan_inf_counted_and_input_untouched  (0.5s)
+PASS  test_portrait_clip  (0.4s)
+PASS  test_channels_1_and_4_match_3  (0.5s)
+PASS  test_nan_inf_counted_and_input_untouched  (0.3s)
 PASS  test_chunked_conversion_is_identical  (0.1s)
-PASS  test_long_clip_bounded_and_fast  (13.5s)
-PASS  test_other_frame_rates  (4.1s)
-PASS  test_node_outputs_and_passthrough  (0.8s)
-PASS  test_node_preview_off_and_animated_flag_false  (0.7s)
+PASS  test_long_clip_bounded_and_fast  (8.8s)
+PASS  test_other_frame_rates  (1.5s)
+PASS  test_node_outputs_and_passthrough  (0.4s)
+PASS  test_node_preview_off_and_animated_flag_false  (0.3s)
 PASS  test_preview_size_range_and_no_upscale  (2.0s)
-PASS  test_video_input_streams_and_matches_images  (4.7s)
-PASS  test_video_trim_window_is_honoured  (0.4s)
-PASS  test_cropped_video_falls_back_to_comfy_decoder  (0.4s)
+PASS  test_video_input_streams_and_matches_images  (3.3s)
+PASS  test_video_trim_window_is_honoured  (0.3s)
+PASS  test_cropped_video_falls_back_to_comfy_decoder  (0.2s)
 PASS  test_exactly_one_input_required  (0.0s)
-PASS  test_video_stream_memory_does_not_grow_with_resolution  (33.0s)
+PASS  test_video_stream_memory_does_not_grow_with_resolution  (34.2s)
 PASS  test_preview_store_evicts_oldest  (0.0s)
 
-33 passed, 0 failed, 84s
+33 passed, 0 failed, 66s
 ```
 
 Speed on 4 CPU cores:
@@ -258,3 +258,39 @@ Unit tests: **33/33 pass** on Linux.
   - Own motion via streaming = **0.98×** the IMAGE-path value (median), 0.93× at the 10th percentile. The extra
     smoothing removes codec shimmer, not real motion.
   - The 29 single-frame still images in the folder now decode and come back `unknown` (fewer than 2 frames).
+
+## 9. Speed (after the third Windows report)
+
+**Windows report.** Commit a25b1a9 on a 2-core Ryzen 3 3250U with 5.9 GB RAM:
+- 32/33 tests passed.
+- The memory test passed.
+- The long-clip test took **123.3 s against its 120 s limit**, with the ComfyUI server running; 74 s on its
+  own.
+- API runs: success, `animated`; 4K clip in 41.3 s.
+
+The 120 s limit was **not** raised. The code was made faster instead, profiled at 2 threads to match that
+laptop. On 1,496 frames, 2 threads:
+
+| Step | Time |
+|---|---|
+| before | 25.3 s |
+| blur each frame once per clip (each frame was blurred ~4×, once per pair it belongs to) | 16.7 s |
+| blur as shifted adds instead of `conv2d` with a 1×5 kernel (6.1× faster, same output to 1.8e-7) | 10.8 s |
+| polish on every 2nd pixel with frame *t*'s fixed gradients (no full warp per iteration) + one tile pass instead of two | **9.2 s** |
+
+- **Overall: 2.75×**, against a 3× target that was missed. Tried and rejected: `unfold` tile cutting (7× slower)
+  and 2 polish iterations instead of 3 (−0.3 s, slightly less accurate).
+- **4 threads:** the long-clip test takes 8.8 s (was 13.5 s), and the full suite 66 s (was 84 s).
+- **Unit tests:** 33/33.
+
+Judges, comparing every verdict against the previous run:
+- **Real clips:** **0 verdict changes** across 230. Own motion new/old: median 1.003, 5th percentile 0.984,
+  worst 0.949. Active-share change: median 0.000, largest 0.025. Analysis is 2.8× faster (2.43 → 0.86 s per
+  clip).
+- **Known-answer clips: 194/195.** The one change is `api_kling_o3_flf2v-1__freeze` (`partly_animated` →
+  `still`).
+  - Its source barely moves for the first 0.5 s, so the variant has only ~0.3 s of motion in 3 s.
+  - Its deciding quarter-second step reads ≈ 0.30% against the 0.30% threshold, so active = 6/41 = 0.146,
+    against a cut-off of 0.15.
+  - Restoring the second tile pass did not change it.
+  - It is reported as a knife-edge case. Nothing was tuned to rescue it.

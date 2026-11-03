@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional as F
 
 from . import camera
-from .filters import blur, gradients
+from .filters import gradients
 
 # Gradient floor and regulariser (|grad I| per px, 0..1 scale). Chosen by a sweep on 195 clips derived from real
 # AI videos (tests/derive_clips.py): at 0.004 / 0.01, H.264 shimmer on weak gradients read as up to 0.44 % "own
@@ -22,19 +22,19 @@ LAMBDA = 0.02  # regulariser of the normal-flow division
 MARGIN = 2  # px ignored at the frame border (blur + gradient support)
 
 
-def residual_motion(frames_a, frames_b, params, speed_px):
+def residual_motion(blurred_a, blurred_b, params, speed_px):
     """Per pair: share of textured pixels moving on their own, plus the per-pixel moving mask.
 
-    frames_a, frames_b: (K, h, w); params: (K, 6) camera motion a -> b; speed_px: threshold in px per pair.
+    blurred_a, blurred_b: (K, h, w) frames after filters.blur (done once per clip by the caller); params: (K, 6)
+    camera motion a -> b; speed_px: threshold in px per pair.
     Returns moving_share (K,), textured_share (K,), moving mask (K, h, w) bool.
     """
-    k, h, w = frames_a.shape
+    k, h, w = blurred_a.shape
     if min(h, w) <= 2 * MARGIN + 2:
         empty = torch.zeros(k)
         return empty, empty.clone(), torch.zeros((k, h, w), dtype=torch.bool)
-    aligned, inside = camera.warp(frames_b, params)
-    a = blur(frames_a)
-    b = blur(aligned)
+    b, inside = camera.warp(blurred_b, params)
+    a = blurred_a
     valid = inside.clone()
     valid[:, :MARGIN] = False
     valid[:, -MARGIN:] = False

@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 import torch
 
 from . import camera, residual
+from .filters import blur
 
 ANALYSIS_LONG_SIDE = 320  # px; analysis frames are at most this big (motion of 1/320 of the frame is still seen)
 STEP_SECONDS = 0.25  # frames are compared this far apart, so slow motion adds up above the noise floor
@@ -96,12 +97,12 @@ def analyze(gray, nonfinite, fps, min_speed, min_area, keep_masks=False):
     moving_share, textured, speed, inliers = [], [], [], []
     tx, ty, zoom, rot = [], [], [], []
     masks = [] if keep_masks else None
+    blurred = torch.cat([blur(gray[i:i + 256]) for i in range(0, n, 256)])  # once per frame, not once per pair
     starts = torch.arange(0, n - step)
     for i in range(0, len(starts), PAIR_CHUNK):
         idx = starts[i:i + PAIR_CHUNK]
-        fa, fb = gray[idx], gray[idx + step]
-        params, inl = camera.estimate(fa, fb)
-        share, tex, mask = residual.residual_motion(fa, fb, params, speed_px)
+        params, inl = camera.estimate(gray[idx], gray[idx + step], blurred[idx], blurred[idx + step])
+        share, tex, mask = residual.residual_motion(blurred[idx], blurred[idx + step], params, speed_px)
         moving_share.append(share)
         textured.append(tex)
         inliers.append(inl)

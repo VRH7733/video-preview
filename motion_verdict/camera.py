@@ -7,7 +7,7 @@ Method:
 3. A robust (Tukey IRLS) least-squares fit of an affine motion field to the tile shifts. Tiles covering a moving
    subject disagree with the majority and get weight 0.
 Steps 2 and 3 run twice.
-4. A robust Gauss-Newton (Lucas-Kanade) polish of the affine on all pixels. Everything is batched over frame pairs; there is no Python loop over frames.
+4. A robust Gauss-Newton (Lucas-Kanade) polish of the affine on every other pixel of the blurred frames. Everything is batched over frame pairs; there is no Python loop over frames.
 
 Motion model, in pixels, with coordinates centred on the frame centre:
     x_b = x_a + t + M @ x_a      t = (tx, ty), M = [[m11, m12], [m21, m22]]
@@ -19,12 +19,12 @@ import math
 import torch
 import torch.nn.functional as F
 
-from .filters import blur, gradients
+from .filters import gradients
 
 PEAK_MIN = 0.08  # phase-correlation peaks below this are treated as "no match" (pure noise peaks are ~0.02-0.05)
 TUKEY_C = 4.685  # standard Tukey biweight constant (95% efficiency for Gaussian residuals)
 RESID_FLOOR = 0.1  # px; keeps the robust scale from collapsing when all tiles agree perfectly
-PASSES = 2
+PASSES = 1  # one tile pass is enough: the pixel-level polish after it converges to the same result (tested)
 
 
 def _hann2(h, w):
@@ -90,13 +90,14 @@ def centred_coords(h, w):
     return xx, yy
 
 
-def warp(b, params):
+def warp(b, params, coords=None):
     """Sample frames b (K, h, w) at x_b = x + t + M x, i.e. bring frame b back onto frame a.
 
-    Returns the warped frames and a mask of pixels whose source lies inside frame b.
+    coords: optional (xx, yy) centred sample positions (default: every pixel). Returns the warped samples and a mask
+    of samples whose source lies inside frame b.
     """
     k, h, w = b.shape
-    xx, yy = centred_coords(h, w)
+    xx, yy = centred_coords(h, w) if coords is None else coords
     tx, ty, m11, m12, m21, m22 = [params[:, i].view(k, 1, 1) for i in range(6)]
     xb = xx + tx + m11 * xx + m12 * yy
     yb = yy + ty + m21 * xx + m22 * yy
@@ -142,8 +143,9 @@ def fit_affine(dx, dy, peak, cx, cy, iters=5):
     return params, inliers
 
 
-def estimate(frames_a, frames_b):
-    """Affine camera motion from frames_a to frames_b, both (K, h, w). Returns params (K, 6) and inliers (K,)."""
+def estimate(frames_a, frames_b, blurred_a, blurred_b):
+    """Affine camera motion from frames_a to frames_b, both (K, h, w); blurred_*: the same frames after
+    filters.blur (computed once per clip by the caller). Returns params (K, 6) and inliers (K,)."""
     k, h, w = frames_a.shape
     t = tile_size(h, w)
     if t == 0:
@@ -161,7 +163,7 @@ def estimate(frames_a, frames_b):
         dx, dy, peak = phase_corr(tiles_a, cut_tiles(aligned, ys, xs, t))
         delta, inliers = fit_affine(dx, dy, peak, cx, cy)
         params = params + delta  # small-motion composition; the second pass corrects the first
-    return refine(frames_a, frames_b, params), inliers
+    return refine(blurred_a, blurred_b, params), inliers
 
 
 def corner_speed(params, h, w):
@@ -183,27 +185,30 @@ def decompose(params):
     return tx, ty, zoom, rot
 
 
-def refine(frames_a, frames_b, params, iters=3):
-    """Polish the affine estimate on all pixels (robust Gauss-Newton / Lucas-Kanade, batched).
+def refine(blurred_a, blurred_b, params, iters=3):
+    """Polish the affine estimate (robust Gauss-Newton / Lucas-Kanade, batched) on blurred frames.
 
     The tile fit is accurate to a few tenths of a pixel; fine texture turns even that much misalignment into
-    apparent "motion". This step brings the registration error down by using every textured pixel. Pixels that
-    disagree strongly (a moving subject) get weight 0 through the same Tukey weights as the tile fit.
+    apparent "motion". This step brings the registration error down using every other pixel in each direction
+    (~14,000 samples for 6 unknowns at 320x180) and the gradients of frame a, which are fixed, so no full-frame
+    warp is needed per iteration. Pixels that disagree strongly (a moving subject) get weight 0 through the same
+    Tukey weights as the tile fit.
     """
-    k, h, w = frames_a.shape
+    k, h, w = blurred_a.shape
     if tile_size(h, w) == 0:
         return params
-    a = blur(frames_a)
-    b_src = blur(frames_b)
     xx, yy = centred_coords(h, w)
+    sub = (slice(1, -1, 2), slice(1, -1, 2))  # every 2nd pixel, away from the 1-px gradient border
+    gx, gy = gradients(blurred_a)
+    a = blurred_a[:, sub[0], sub[1]].flatten(1)
+    gx, gy = gx[:, sub[0], sub[1]].flatten(1), gy[:, sub[0], sub[1]].flatten(1)
+    xs, ys = xx[sub], yy[sub]
     s = max(w, h) / 2
-    ux, uy = (xx / s)[None], (yy / s)[None]
+    ux, uy = (xs / s).flatten()[None], (ys / s).flatten()[None]
+    jac = torch.stack([gx, gy, gx * ux, gx * uy, gy * ux, gy * uy], 1)  # (K, 6, P), fixed across iterations
     for _ in range(iters):
-        b, inside = warp(b_src, params)
-        gx, gy = gradients(b)
-        err = b - a
-        jac = torch.stack([gx, gy, gx * ux, gx * uy, gy * ux, gy * uy], 1).flatten(2)  # (K, 6, P)
-        e = err.flatten(1)
+        b, inside = warp(blurred_b, params, (xs, ys))
+        e = b.flatten(1) - a
         valid = inside.flatten(1).float()
         med = torch.where(valid > 0, e.abs(), torch.full_like(e, float("nan"))).nanmedian(1).values.nan_to_num(0.0)
         c = TUKEY_C * (1.4826 * med + 1e-3)

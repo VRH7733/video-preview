@@ -78,17 +78,20 @@ The `ui` part is stored in ComfyUI's `/history`, so API clients can read the ver
       estimate, then each tile is phase-correlated, with parabolic sub-pixel peaks; peak height = confidence.
    3. A robust affine fit of `x_b = x + t + M x` to the tile shifts: Tukey IRLS, 5 iterations,
       c = 4.685 × (1.4826·MAD + 0.1 px). Tiles on a moving subject get weight 0.
-   4. Steps 2-3 run twice.
-   5. A robust Gauss-Newton (Lucas-Kanade) polish of the 6 affine parameters on all pixels, 3 iterations,
-      same Tukey weights.
+   4. Steps 2-3 run once. On synthetic moves a second pass gave identical camera errors (to 1e-5) once step 5
+      follows; on 229 real clips own motion changed by a median factor of 1.003 (worst 0.949).
+   5. A robust Gauss-Newton (Lucas-Kanade) polish of the 6 affine parameters on the blurred frames, 3 iterations,
+      same Tukey weights. It uses every 2nd pixel in each direction (~14,000 samples at 320×180) and the fixed
+      gradients of frame *t*, so no full-frame warp is needed per iteration.
    6. Readable terms:
       - pan / tilt: −t_x / w and t_y / h, in % per second (content moving left = the camera pans right);
       - zoom: ½·log det(I+M), in % per second;
       - roll: atan2(m21 − m12, 2 + m11 + m22), in degrees per second, sign flipped to the camera's view;
       - camera speed: the largest corner displacement, in % of the long side per second.
 4. **Own motion** (`residual.py`):
-   1. Warp frame *t+k* onto frame *t* with the camera transform.
-   2. Binomial blur (σ≈1 px).
+   1. Every analysis frame is blurred **once per clip** (binomial σ≈1 px, written as shifted adds: 6× faster than
+      `conv2d` on CPU). Each frame is part of up to two pairs.
+   2. Warp blurred frame *t+k* onto blurred frame *t* with the camera transform.
    3. Remove the global gain and offset, so exposure flicker is not read as motion.
    4. Normal-flow magnitude: |ΔI|·|∇I| / (|∇I|² + λ²).
    5. Pixels count only if they are inside the warp, ≥2 px from the border and textured (|∇I| ≥ GRAD_MIN).
