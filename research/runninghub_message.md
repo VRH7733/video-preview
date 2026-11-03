@@ -48,6 +48,14 @@ I found no node that gives this verdict. In your own node search:
   Neither removes the camera motion to judge whether the scene itself moves.
 - WAS *Camera Motion Trajectory from Images* does the opposite: it *makes* a camera move over a still image.
 - Motion Mask Tracker, shotdrift, shotcheck, VideoGate and frameaudit do not show up there.
+- The closest analysis nodes are **MiniMax H3 RAFT Motion Audit** and **Motion Quality Audit**. Their panels describe
+  raw flow and frame deltas with **no camera removal**, so a camera move over a still picture would count as
+  motion there. On my 78 camera-only test clips the camera alone gives 0.5-2.4 px/frame of flow, and Motion
+  Verdict reports ≤ 0.2 % own motion (`camera_only`).
+- To be transparent: chaining **Video Stabilizer (Flow) → RAFT Motion Audit** could approximate part of this.
+  But that is 2-3 nodes plus a RAFT model, gives raw pixel numbers instead of a verdict, and cannot by itself
+  tell `camera_only` from `still`. Motion Verdict is one CPU-only node with a verdict, a BOOLEAN and stall
+  times.
 
 **Dependencies:** only torch, numpy and av. Runs on CPU, makes no network calls, writes nothing outside
 ComfyUI's output folder (and only if `save_report` is on). MIT licence.
@@ -102,6 +110,12 @@ Hunyuan、Kling 等）经常只输出对首帧图片的缓慢推拉或平移，�
   它们都没有先去掉镜头运动，再判断画面本身是否在动。
 - WAS 的 *Camera Motion Trajectory from Images* 正好相反：它是对静止图片*生成*镜头运动。
 - 搜索 Motion Mask Tracker、shotdrift、shotcheck、VideoGate、frameaudit 都没有结果。
+- 最接近的分析节点是 **MiniMax H3 RAFT Motion Audit** 和 **Motion Quality Audit**。它们的面板说明里只有原始光流和帧差，
+  **没有提到去除镜头运动**，所以对静止画面做的镜头运动在那里会被算作"在动"。在我的 78 段纯镜头运动测试片段上，仅镜头本身就产生
+  0.5-2.4 像素/帧的光流，而 Motion Verdict 报告的自身运动 ≤ 0.2%（判为 `camera_only`）。
+- 坦白说：把 **Video Stabilizer (Flow) → RAFT Motion Audit** 串起来，可以近似实现其中一部分。但那需要 2-3 个节点加一个
+  RAFT 模型，输出的是原始像素数值而不是判定，而且单靠它分不出 `camera_only` 和 `still`。Motion Verdict 是一个只用 CPU
+  的节点，直接给出判定、布尔值和停滞时间段。
 
 **依赖：** 只需要 torch、numpy、av。可在 CPU 上运行，不联网；只有打开 `save_report` 时才会写文件，而且只写到
 ComfyUI 的 output 目录。MIT 许可证。

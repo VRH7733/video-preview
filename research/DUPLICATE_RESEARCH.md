@@ -224,3 +224,38 @@ Conclusion for RunningHub specifically [likely, from the screenshots]:
   - DepthAnythingV3 camera pose: model-based camera extrinsics.
 
   Neither removes camera motion to judge whether the scene itself moves, and neither returns a verdict.
+
+### Systematic search (56 terms), run in the user's logged-in Chrome by Claude in Chrome
+
+Full sheet: [`runninghub_search_2026-11-03.xlsx`](runninghub_search_2026-11-03.xlsx).
+
+Summary:
+- 56 terms searched (English + Chinese); 19 had zero results; 4 hit the ~64-result display cap.
+- 15 candidate nodes reviewed through their side panels.
+- **Nodes meeting all three duplicate criteria: 0.** The criteria are (a) takes frames, (b) removes camera
+  motion, (c) outputs how much the scene still moves.
+
+The closest nodes:
+
+| Node (pack) | Panel: inputs → outputs | (a) | (b) | (c) | Why not a duplicate |
+|---|---|---|---|---|---|
+| **MiniMax H3 RAFT Motion Audit / 光流运动审计** (comfyui-minimax-h3-…, T8) | frames + RAFT model settings, scene_cut_threshold → flow_preview, report_json, mean_motion_px, p95_motion_px, scene_cut_count. "Read-only RAFT optical-flow audit for real motion, sudden cuts and temporal collapse." | yes | **no** | partial | Raw flow magnitude, camera included. On our 78 camera-only clips the camera alone produces 0.46-2.37 px/frame of flow (median 0.86 at 300-512 px, ≈ 2-9 px/frame at 1280 px), all of which a raw-flow meter counts as motion. It also needs RAFT weights. The README does not document the node [certain about the panel; what it concludes from these numbers is unknown] |
+| **MiniMax H3 Motion Quality Audit / 高运动质量审计** (same pack) | frames, fps, roi, sharpness floor, high_motion_delta_floor, freeze_delta_ceiling, face_mask → risk_detected BOOLEAN, risk ranges, report_json. "dependency-free temporal proxy audit; flags freeze / high-motion risk ranges" | yes | **no** | partial | Frame-delta proxy. A camera move over a still picture changes the pixels, so a frame-delta freeze check passes it [likely, from the panel description] |
+| **Video Stabilizer (Flow) / (Classic)** (nomadoor/ComfyUI-Video-Stabilizer) | frames, transform_mode, camera_lock, strength, smooth → Stabilized Frames, Padding Mask, Meta JSON | yes | yes | **no** | README: "The `meta` output ... records the exact camera motion that was removed", so it can be re-applied, reversed or used to add shake. It records the **camera**, and says nothing about how much the scene moves. Its purpose is stabilization / outpainting of the padding [certain from README] |
+| Optical Flow Composite (Global Align) (UtilsCollection) | original + generated image → composited image, change mask, report | yes | unclear | no | A compositor for two images, not a clip analyser [likely] |
+| BFS Video Compare, OmniShotCut Analyze Video, Radiance QC Pro, FL Black Frame Reject, H3 Jerk Oracle / Heatmap, RAFT Run, Unimatch, Optical Flow Direction Mask, RAFT Mask Propagation, H3 Still Preflight, H3 Select Still Frame | (see sheet) | | | | two-video pixel difference / shot cuts / single-image QC / black pixels / latent speed / flow or masks only / still-image contract check [certain from panels] |
+
+**The honest weak point [likely, untested].** A chain *Video Stabilizer (Flow, camera_lock) → RAFT Motion Audit
+or Motion Quality Audit* could approximate part of Motion Verdict: after stabilization, little motion is left
+in a camera-only clip. That chain:
+- needs 2-3 nodes and RAFT weights;
+- reports raw pixel numbers rather than a verdict;
+- cannot by itself tell `camera_only` from `still`, since both end up with almost no motion after
+  stabilization unless the user also parses the stabilizer's meta JSON;
+- leaves padding borders that change from frame to frame.
+
+Whether RunningHub treats a possible chain of other nodes as "the same function" is their call and is not
+documented. This should be said openly in the request.
+
+Broad terms hit the display cap, and the RAFT Motion Audit did not appear under "RAFT", so a node missing from
+a capped list proves nothing. Terms not yet tried: `camera lock`, `stabilized motion`, `residual flow`.

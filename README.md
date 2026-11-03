@@ -38,9 +38,11 @@ own.**
 | RyanOnTheInside *Motion Feature* | motion amount from optical flow (its README documents no camera removal), as a signal that drives effects |
 | DepthAnythingV3 *Parse Camera Pose* | camera pose from a depth model |
 | WAS *Camera Motion Trajectory from Images* | **makes** a camera move over stills: the opposite of this node |
+| MiniMax H3 *RAFT Motion Audit* / *Motion Quality Audit* | raw optical-flow motion / frame-delta freeze risk; their panels describe **no camera removal**, so a camera move over a still picture would count as motion |
+| Video Stabilizer (Flow / Classic) | removes camera shake; its meta output records the camera motion that was removed, not how much the scene moves |
 
 None of them removes the camera motion to judge whether the scene itself moves. Searches for Motion Mask
-Tracker, shotdrift, shotcheck, VideoGate and frameaudit returned no node.
+Tracker, shotdrift, shotcheck, VideoGate and frameaudit returned no node (56 search terms in total, see the research).
 
 The full research is in [`research/DUPLICATE_RESEARCH.md`](research/DUPLICATE_RESEARCH.md).
 
