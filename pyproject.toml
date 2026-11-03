@@ -1,0 +1,17 @@
+[project]
+name = "comfyui-motion-verdict"
+description = "Motion Verdict: is an AI video really animated, or only a camera move over a still picture? Removes the camera's pan/tilt/zoom/roll, measures what still moves on its own, and returns a verdict (animated / partly_animated / camera_only / still), an 'animated' BOOLEAN for gating seed batches, a subject-motion score, stall times, a timeline IMAGE and a JSON report. CPU friendly, works in API runs. Optional in-memory preview on the node."
+version = "1.0.0"
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/VRH7733/ComfyUI-MotionVerdict"
+Issues = "https://github.com/VRH7733/ComfyUI-MotionVerdict/issues"
+
+[tool.comfy]
+PublisherId = "raghav"
+DisplayName = "Motion Verdict"
+Icon = ""
